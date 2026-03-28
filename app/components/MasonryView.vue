@@ -2,9 +2,10 @@
   <div class="fixed inset-0 z-10 overflow-auto pt-16 pb-20 px-4 md:px-8">
     <div class="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-3 md:gap-4 max-w-7xl mx-auto">
       <div
-        v-for="project in projects"
+        v-for="(project, i) in projects"
         :key="project.id"
-        class="break-inside-avoid mb-3 md:mb-4 group cursor-pointer"
+        class="break-inside-avoid mb-3 md:mb-4 group cursor-pointer reveal-item"
+        :style="{ animationDelay: `${i * 50}ms` }"
         role="button"
         tabindex="0"
         @click="$emit('open', project)"
@@ -52,5 +53,18 @@ defineEmits<{ open: [project: Project] }>()
 <style scoped>
 .clip-card {
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+.reveal-item {
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+  animation: revealUp 0.4s ease-out forwards;
+}
+
+@keyframes revealUp {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 </style>

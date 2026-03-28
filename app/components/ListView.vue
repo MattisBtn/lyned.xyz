@@ -12,7 +12,8 @@
       <div
         v-for="(project, i) in projects"
         :key="project.id"
-        class="group cursor-pointer border border-white/[0.06] bg-black/60 backdrop-blur-sm mb-1 hover:border-white/15 hover:bg-black/70 transition-all duration-200 clip-row"
+        class="group cursor-pointer border border-white/[0.06] bg-black/60 backdrop-blur-sm mb-1 hover:border-white/15 hover:bg-black/70 transition-all duration-200 clip-row reveal-row"
+        :style="{ animationDelay: `${i * 30}ms` }"
         role="button"
         tabindex="0"
         @click="$emit('open', project)"
@@ -74,5 +75,18 @@ defineEmits<{ open: [project: Project] }>()
 <style scoped>
 .clip-row {
   clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+
+.reveal-row {
+  opacity: 0;
+  transform: translateX(-20px);
+  animation: revealSlide 0.3s ease-out forwards;
+}
+
+@keyframes revealSlide {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 </style>

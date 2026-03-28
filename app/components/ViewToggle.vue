@@ -40,7 +40,8 @@ const modes = [
 ]
 
 function select(value: ViewMode) {
-  sound.click()
+  if (value === props.modelValue) return
+  sound.open()
   emit('update:modelValue', value)
 }
 </script>

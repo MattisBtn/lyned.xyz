@@ -14,36 +14,39 @@
     <!-- View toggle (bottom right) -->
     <ViewToggle v-model="viewMode" />
 
-    <!-- Canvas view -->
-    <SandboxCanvas
-      v-if="viewMode === 'canvas'"
-      :disabled="!!activeProject"
-      :projects="projects"
-      v-slot="{ isVisible }"
-    >
-      <ProjectCard
-        v-for="project in projects"
-        :key="project.id"
-        v-show="filter === 'all' || project.type === filter"
-        :project="project"
-        :visible="isVisible(project)"
+    <!-- Views with transition -->
+    <Transition :name="viewTransition" mode="out-in">
+      <SandboxCanvas
+        v-if="viewMode === 'canvas'"
+        key="canvas"
+        :disabled="!!activeProject"
+        :projects="projects"
+        v-slot="{ isVisible }"
+      >
+        <ProjectCard
+          v-for="project in projects"
+          :key="project.id"
+          v-show="filter === 'all' || project.type === filter"
+          :project="project"
+          :visible="isVisible(project)"
+          @open="openProject"
+        />
+      </SandboxCanvas>
+
+      <MasonryView
+        v-else-if="viewMode === 'masonry'"
+        key="masonry"
+        :projects="filteredProjects"
         @open="openProject"
       />
-    </SandboxCanvas>
 
-    <!-- Masonry view -->
-    <MasonryView
-      v-else-if="viewMode === 'masonry'"
-      :projects="filteredProjects"
-      @open="openProject"
-    />
-
-    <!-- List view -->
-    <ListView
-      v-else
-      :projects="filteredProjects"
-      @open="openProject"
-    />
+      <ListView
+        v-else
+        key="list"
+        :projects="filteredProjects"
+        @open="openProject"
+      />
+    </Transition>
 
     <!-- Loading / Error state -->
     <div v-if="loading || error" class="fixed inset-0 z-20 flex items-center justify-center pointer-events-none">
@@ -70,7 +73,16 @@ import type { ViewMode } from '~/components/ViewToggle.vue'
 const activeProject = ref<Project | null>(null)
 const filter = ref<FilterValue>('all')
 const viewMode = ref<ViewMode>('canvas')
+const viewTransition = ref('view-fade')
 const sound = useSound()
+
+// Track direction for transition
+watch(viewMode, (to, from) => {
+  const order: ViewMode[] = ['canvas', 'masonry', 'list']
+  const fromIdx = order.indexOf(from)
+  const toIdx = order.indexOf(to)
+  viewTransition.value = toIdx > fromIdx ? 'view-slide-left' : 'view-slide-right'
+})
 
 // Fetch projects from API (R2-backed) — client-only
 const projectsData = ref<Project[]>([])
@@ -106,3 +118,31 @@ function closeProject() {
   activeProject.value = null
 }
 </script>
+
+<style>
+/* View transitions — directional slide + fade */
+.view-slide-left-enter-active,
+.view-slide-left-leave-active,
+.view-slide-right-enter-active,
+.view-slide-right-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.view-slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(40px);
+}
+.view-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.view-slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-40px);
+}
+.view-slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(40px);
+}
+</style>
