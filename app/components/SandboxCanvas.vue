@@ -21,27 +21,27 @@
 </template>
 
 <script setup lang="ts">
-import { projects } from '~/data/projects'
+import type { Project } from '~/data/projects'
 
-const props = defineProps<{ disabled?: boolean }>()
+const props = defineProps<{ disabled?: boolean, projects: Project[] }>()
 
 // --- Canvas size from project bounds ---
 const PADDING = 100
 const canvasW = computed(() => {
   let max = 0
-  for (const p of projects) {
+  for (const p of props.projects) {
     const r = p.x + p.width + PADDING
     if (r > max) max = r
   }
-  return max
+  return Math.max(max, 800)
 })
 const canvasH = computed(() => {
   let max = 0
-  for (const p of projects) {
+  for (const p of props.projects) {
     const b = p.y + p.height + PADDING
     if (b > max) max = b
   }
-  return max
+  return Math.max(max, 600)
 })
 
 // --- Smooth drag with momentum ---

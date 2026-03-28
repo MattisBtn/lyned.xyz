@@ -3,8 +3,20 @@ import tailwindcss from '@tailwindcss/vite'
 export default defineNuxtConfig({
   compatibilityDate: '2026-03-28',
   devtools: { enabled: false },
+  ssr: false,
   vite: {
     plugins: [tailwindcss()],
+  },
+  nitro: {
+    routeRules: {
+      '/**': {
+        headers: {
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'DENY',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+        },
+      },
+    },
   },
   css: ['~/assets/css/tailwind.css'],
   app: {

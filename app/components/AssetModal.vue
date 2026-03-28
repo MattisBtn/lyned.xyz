@@ -59,7 +59,7 @@
           <!-- Bottom bar -->
           <div class="border-t border-white/[0.06] px-4 py-2 flex items-center justify-between">
             <span class="font-sans text-[9px] text-white/20 uppercase tracking-[0.2em]">
-              {{ project.type === 'video' ? 'MP4' : 'PNG' }} // {{ project.id }}
+              {{ project.type === 'video' ? 'MP4' : 'WEBP' }} // {{ project.id }}
             </span>
             <span class="font-sans text-[9px] text-white/20 uppercase tracking-[0.2em]">
               lyned.xyz

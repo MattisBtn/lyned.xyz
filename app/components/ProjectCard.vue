@@ -1,16 +1,20 @@
 <template>
   <div
     class="absolute group"
-    :style="{ left: `${project.x}px`, top: `${project.y}px`, width: `${project.width}px` }"
+    :class="isDragging ? 'z-20 cursor-grabbing' : 'cursor-pointer'"
+    :style="{ left: `${cardX}px`, top: `${cardY}px`, width: `${project.width}px` }"
     role="button"
     :tabindex="visible ? 0 : -1"
     :aria-label="`View ${project.title}`"
-    @pointerup="handleClick"
-    @keydown.enter="handleClick"
-    @keydown.space.prevent="handleClick"
+    @pointerdown.stop="onPointerDown"
+    @keydown.enter="openModal"
+    @keydown.space.prevent="openModal"
   >
     <!-- Card frame -->
-    <div class="relative border border-white/10 bg-black/30 transition-all duration-300 hover:border-white/25 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] focus-within:border-white/25 card-clip">
+    <div
+      class="relative border border-white/10 bg-black/30 hover:border-white/25 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] focus-within:border-white/25 card-clip"
+      :class="isDragging ? 'border-white/30 shadow-[0_0_30px_rgba(255,255,255,0.1)]' : 'transition-all duration-300'"
+    >
 
       <!-- Scan line overlay -->
       <div class="absolute inset-0 pointer-events-none z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 scan-lines" />
@@ -23,37 +27,36 @@
 
       <!-- Media -->
       <div class="overflow-hidden relative" :style="{ height: `${project.height}px` }">
-        <!-- Thumbnail fallback -->
+        <!-- Video: thumbnail fallback + lazy video -->
+        <template v-if="project.type === 'video'">
+          <img
+            v-if="visible"
+            :src="project.thumbnail"
+            :alt="project.title"
+            loading="lazy"
+            class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            draggable="false"
+          />
+          <video
+            v-if="showVideo"
+            ref="videoEl"
+            :src="project.src"
+            muted
+            autoplay
+            loop
+            playsinline
+            class="relative w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]"
+            @loadeddata="onVideoReady"
+            style="opacity: 0; transition: opacity 0.4s ease"
+          />
+        </template>
+        <!-- Image: single img, no double load -->
         <img
-          v-if="visible"
-          :src="project.thumbnail"
+          v-else-if="visible"
+          :src="project.src"
           :alt="project.title"
           loading="lazy"
-          class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          draggable="false"
-        />
-
-        <!-- Video: lazy loaded, unloaded when off-screen for 10s -->
-        <video
-          v-if="project.type === 'video' && showVideo"
-          ref="videoEl"
-          :src="project.src"
-          muted
-          autoplay
-          loop
-          playsinline
-          class="relative w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]"
-          @loadeddata="onVideoReady"
-          style="opacity: 0; transition: opacity 0.4s ease"
-        />
-
-        <!-- Image -->
-        <img
-          v-else-if="project.type === 'image' && visible"
-          :src="project.src"
-          :alt="project.title"
-          loading="lazy"
-          class="relative w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]"
+          class="w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]"
           draggable="false"
         />
       </div>
@@ -76,19 +79,69 @@ import type { Project } from '~/data/projects'
 const props = defineProps<{ project: Project, visible: boolean }>()
 const emit = defineEmits<{ open: [project: Project] }>()
 
-const wasClick = inject<() => boolean>('wasClick', () => true)
 const sound = useSound()
 const videoEl = ref<HTMLVideoElement | null>(null)
 const showVideo = ref(false)
 let unloadTimer: ReturnType<typeof setTimeout> | null = null
 
-// Unified visibility watcher: load/unload video, play/pause
+// --- Draggable position ---
+const offsetX = ref(0)
+const offsetY = ref(0)
+const isDragging = ref(false)
+const cardX = computed(() => props.project.x + offsetX.value)
+const cardY = computed(() => props.project.y + offsetY.value)
+
+const CLICK_THRESHOLD = 5
+let dragStartX = 0
+let dragStartY = 0
+let dragStartOffX = 0
+let dragStartOffY = 0
+let dragDist = 0
+
+function onPointerDown(e: PointerEvent) {
+  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  dragDist = 0
+  dragStartX = e.clientX
+  dragStartY = e.clientY
+  dragStartOffX = offsetX.value
+  dragStartOffY = offsetY.value
+
+  const el = e.currentTarget as HTMLElement
+
+  const onMove = (ev: PointerEvent) => {
+    const dx = ev.clientX - dragStartX
+    const dy = ev.clientY - dragStartY
+    dragDist = Math.sqrt(dx * dx + dy * dy)
+    if (dragDist > CLICK_THRESHOLD) {
+      isDragging.value = true
+      offsetX.value = dragStartOffX + dx
+      offsetY.value = dragStartOffY + dy
+    }
+  }
+
+  const onUp = () => {
+    el.removeEventListener('pointermove', onMove)
+    el.removeEventListener('pointerup', onUp)
+    if (dragDist < CLICK_THRESHOLD) {
+      openModal()
+    }
+    isDragging.value = false
+  }
+
+  el.addEventListener('pointermove', onMove)
+  el.addEventListener('pointerup', onUp)
+}
+
+function openModal() {
+  sound.click()
+  emit('open', props.project)
+}
+
+// --- Video lifecycle ---
 watch(() => props.visible, (visible) => {
   if (props.project.type !== 'video') return
-
   if (visible) {
     if (unloadTimer) { clearTimeout(unloadTimer); unloadTimer = null }
-
     if (!showVideo.value) {
       showVideo.value = true
     } else {
@@ -96,8 +149,6 @@ watch(() => props.visible, (visible) => {
     }
   } else {
     videoEl.value?.pause()
-
-    // Unload after 10s of being off-screen
     unloadTimer = setTimeout(() => {
       showVideo.value = false
       unloadTimer = null
@@ -107,13 +158,6 @@ watch(() => props.visible, (visible) => {
 
 function onVideoReady(e: Event) {
   (e.target as HTMLVideoElement).style.opacity = '1'
-}
-
-function handleClick() {
-  if (wasClick()) {
-    sound.click()
-    emit('open', props.project)
-  }
 }
 
 onUnmounted(() => {

@@ -47,11 +47,11 @@
 </template>
 
 <script setup lang="ts">
-import { projects } from '~/data/projects'
+import type { Project } from '~/data/projects'
 
 export type FilterValue = 'all' | 'image' | 'video'
 
-const props = defineProps<{ modelValue: FilterValue }>()
+const props = defineProps<{ modelValue: FilterValue, projects: Project[] }>()
 const emit = defineEmits<{ 'update:modelValue': [value: FilterValue] }>()
 
 const root = ref<HTMLElement | null>(null)
@@ -61,19 +61,19 @@ const optionEls = reactive<HTMLButtonElement[]>([])
 const open = ref(false)
 const sound = useSound()
 
-const counts = {
-  all: projects.length,
-  image: projects.filter(p => p.type === 'image').length,
-  video: projects.filter(p => p.type === 'video').length,
-}
+const counts = computed(() => ({
+  all: props.projects.length,
+  image: props.projects.filter(p => p.type === 'image').length,
+  video: props.projects.filter(p => p.type === 'video').length,
+}))
 
-const options = [
-  { value: 'all' as const, label: 'All', count: counts.all },
-  { value: 'image' as const, label: 'Graphic', count: counts.image },
-  { value: 'video' as const, label: 'Motion', count: counts.video },
-]
+const options = computed(() => [
+  { value: 'all' as const, label: 'All', count: counts.value.all },
+  { value: 'image' as const, label: 'Graphic', count: counts.value.image },
+  { value: 'video' as const, label: 'Motion', count: counts.value.video },
+])
 
-const activeLabel = computed(() => options.find(o => o.value === props.modelValue)?.label ?? 'All')
+const activeLabel = computed(() => options.value.find(o => o.value === props.modelValue)?.label ?? 'All')
 
 function toggleDropdown() {
   sound.click()
