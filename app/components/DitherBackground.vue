@@ -255,8 +255,13 @@ onMounted(() => {
   const uTexDither = gl.getUniformLocation(ditherProg, 'uCloudTexture')
 
   let w = 0, h = 0
+  const isMobile = window.innerWidth < 768
+  const FRAME_INTERVAL = isMobile ? 67 : 0 // ~15fps on mobile, uncapped on desktop
+  let lastFrameTime = 0
+
   function resize() {
-    const dpr = Math.min(window.devicePixelRatio, 2)
+    // C1: Lower DPR on mobile — dither pixelates anyway (4x4 blocks)
+    const dpr = isMobile ? 0.5 : Math.min(window.devicePixelRatio, 1.5)
     const newW = Math.floor(cvs.clientWidth * dpr)
     const newH = Math.floor(cvs.clientHeight * dpr)
     if (newW !== w || newH !== h) {
@@ -270,7 +275,13 @@ onMounted(() => {
 
   const startTime = performance.now()
 
-  function render() {
+  function render(now?: number) {
+    // C3: Throttle to ~15fps on mobile
+    if (FRAME_INTERVAL && now && now - lastFrameTime < FRAME_INTERVAL) {
+      raf = requestAnimationFrame(render)
+      return
+    }
+    lastFrameTime = now || 0
     resize()
     const time = (performance.now() - startTime) * 0.001
 

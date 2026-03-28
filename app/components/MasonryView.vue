@@ -5,7 +5,7 @@
         v-for="(project, i) in projects"
         :key="project.id"
         class="break-inside-avoid mb-3 md:mb-4 group cursor-pointer reveal-item"
-        :style="{ animationDelay: `${i * 50}ms` }"
+        :style="{ animationDelay: i < 12 ? `${i * 50}ms` : '0ms' }"
         role="button"
         tabindex="0"
         @click="$emit('open', project)"

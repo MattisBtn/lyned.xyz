@@ -152,7 +152,7 @@ watch(() => props.visible, (visible) => {
     unloadTimer = setTimeout(() => {
       showVideo.value = false
       unloadTimer = null
-    }, 10000)
+    }, import.meta.client && window.innerWidth < 768 ? 2000 : 10000)
   }
 }, { immediate: true })
 

@@ -12,8 +12,8 @@
       <div
         v-for="(project, i) in projects"
         :key="project.id"
-        class="group cursor-pointer border border-white/[0.06] bg-black/60 backdrop-blur-sm mb-1 hover:border-white/15 hover:bg-black/70 transition-all duration-200 clip-row reveal-row"
-        :style="{ animationDelay: `${i * 30}ms` }"
+        class="group cursor-pointer border border-white/[0.06] bg-[#0a0a0f]/85 mb-1 hover:border-white/15 hover:bg-[#0a0a0f]/90 transition-all duration-200 clip-row reveal-row"
+        :style="{ animationDelay: i < 12 ? `${i * 30}ms` : '0ms' }"
         role="button"
         tabindex="0"
         @click="$emit('open', project)"

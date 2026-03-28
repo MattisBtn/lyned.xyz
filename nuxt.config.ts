@@ -16,6 +16,18 @@ export default defineNuxtConfig({
           'Referrer-Policy': 'strict-origin-when-cross-origin',
         },
       },
+      '/api/projects': {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      },
+      '/_nuxt/**': {
+        headers: { 'Cache-Control': 'public, max-age=31536000, immutable' },
+      },
+      '/sounds/**': {
+        headers: { 'Cache-Control': 'public, max-age=86400' },
+      },
+      '/cursors/**': {
+        headers: { 'Cache-Control': 'public, max-age=86400' },
+      },
     },
   },
   css: ['~/assets/css/tailwind.css'],
@@ -29,7 +41,6 @@ export default defineNuxtConfig({
         { name: 'description', content: 'LYNED — Portfolio créatif : Graphic Design, Motion Design, 3D & Web.' },
         { name: 'theme-color', content: '#0a0a0f' },
         { name: 'msapplication-TileColor', content: '#0a0a0f' },
-        // Open Graph
         { property: 'og:type', content: 'website' },
         { property: 'og:url', content: 'https://lyned.xyz' },
         { property: 'og:title', content: 'LYNED — Creative Portfolio' },
@@ -37,13 +48,14 @@ export default defineNuxtConfig({
         { property: 'og:image', content: 'https://lyned.xyz/og-image.png' },
         { property: 'og:image:width', content: '1200' },
         { property: 'og:image:height', content: '630' },
-        // Twitter
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: 'LYNED — Creative Portfolio' },
         { name: 'twitter:description', content: 'Graphic Design, Motion Design, 3D & Web.' },
         { name: 'twitter:image', content: 'https://lyned.xyz/og-image.png' },
       ],
       link: [
+        { rel: 'preconnect', href: 'https://pub-a27b973d02cf433a8b0ddc93d41c22f9.r2.dev', crossorigin: '' },
+        { rel: 'dns-prefetch', href: 'https://pub-a27b973d02cf433a8b0ddc93d41c22f9.r2.dev' },
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
         { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png' },
         { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png' },

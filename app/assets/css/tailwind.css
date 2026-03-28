@@ -35,19 +35,21 @@
   --font-sans: 'TT Lakes Neue', system-ui, sans-serif;
 }
 
-/* === Marathon Cursors === */
-* {
-  cursor: url('/cursors/default.png') 4 2, default;
-}
+/* === Marathon Cursors (desktop only) === */
+@media (pointer: fine) {
+  * {
+    cursor: url('/cursors/default.png') 4 2, default;
+  }
 
-a, button, [role="button"], [type="button"], [type="submit"], .cursor-pointer {
-  cursor: url('/cursors/pointer.png') 10 4, pointer;
-}
+  a, button, [role="button"], [type="button"], [type="submit"], .cursor-pointer {
+    cursor: url('/cursors/pointer.png') 10 4, pointer;
+  }
 
-.cursor-grab {
-  cursor: url('/cursors/grabbing.png') 16 16, grab !important;
-}
+  .cursor-grab {
+    cursor: url('/cursors/grabbing.png') 16 16, grab !important;
+  }
 
-.cursor-grabbing {
-  cursor: url('/cursors/grab.png') 16 16, grabbing !important;
+  .cursor-grabbing {
+    cursor: url('/cursors/grab.png') 16 16, grabbing !important;
+  }
 }

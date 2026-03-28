@@ -1,7 +1,7 @@
 <template>
   <div>
     <Preloader @done="preloaderDone = true" />
-    <DitherBackground />
+    <DitherBackground v-if="preloaderDone" />
     <NuxtPage />
   </div>
 </template>
