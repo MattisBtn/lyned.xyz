@@ -11,8 +11,16 @@
     <!-- Filter dropdown (bottom left) -->
     <FilterDropdown v-model="filter" :projects="projects" />
 
-    <!-- Sandbox -->
-    <SandboxCanvas :disabled="!!activeProject" :projects="projects" v-slot="{ isVisible }">
+    <!-- View toggle (bottom right) -->
+    <ViewToggle v-model="viewMode" />
+
+    <!-- Canvas view -->
+    <SandboxCanvas
+      v-if="viewMode === 'canvas'"
+      :disabled="!!activeProject"
+      :projects="projects"
+      v-slot="{ isVisible }"
+    >
       <ProjectCard
         v-for="project in projects"
         :key="project.id"
@@ -22,6 +30,20 @@
         @open="openProject"
       />
     </SandboxCanvas>
+
+    <!-- Masonry view -->
+    <MasonryView
+      v-else-if="viewMode === 'masonry'"
+      :projects="filteredProjects"
+      @open="openProject"
+    />
+
+    <!-- List view -->
+    <ListView
+      v-else
+      :projects="filteredProjects"
+      @open="openProject"
+    />
 
     <!-- Loading / Error state -->
     <div v-if="loading || error" class="fixed inset-0 z-20 flex items-center justify-center pointer-events-none">
@@ -43,9 +65,11 @@
 <script setup lang="ts">
 import type { Project } from '~/data/projects'
 import type { FilterValue } from '~/components/FilterDropdown.vue'
+import type { ViewMode } from '~/components/ViewToggle.vue'
 
 const activeProject = ref<Project | null>(null)
 const filter = ref<FilterValue>('all')
+const viewMode = ref<ViewMode>('canvas')
 const sound = useSound()
 
 // Fetch projects from API (R2-backed) — client-only
@@ -53,6 +77,11 @@ const projectsData = ref<Project[]>([])
 const projects = computed(() => projectsData.value)
 const loading = ref(true)
 const error = ref(false)
+
+const filteredProjects = computed(() => {
+  if (filter.value === 'all') return projects.value
+  return projects.value.filter(p => p.type === filter.value)
+})
 
 if (import.meta.client) {
   onMounted(async () => {
