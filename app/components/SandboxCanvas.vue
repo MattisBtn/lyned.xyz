@@ -44,15 +44,17 @@ const canvasH = computed(() => {
   return Math.max(max, 600)
 })
 
-// --- Smooth drag with momentum ---
-const targetOffset = reactive({ x: 0, y: 0 })
-const smoothOffset = reactive({ x: 0, y: 0 })
-const velocity = reactive({ x: 0, y: 0 })
+// --- Smooth drag with momentum (M1: non-reactive animation vars) ---
+// Raw JS vars for animation — no Vue reactivity overhead per frame
+let _targetX = 0, _targetY = 0
+let _smoothX = 0, _smoothY = 0
+let _velX = 0, _velY = 0
+let _dragStartX = 0, _dragStartY = 0
+let _dragStartOffX = 0, _dragStartOffY = 0
+let _lastPtrX = 0, _lastPtrY = 0, _lastPtrTime = 0
+
 const isDragging = ref(false)
-const dragStart = reactive({ x: 0, y: 0 })
-const dragStartOffset = reactive({ x: 0, y: 0 })
 const dragDistance = ref(0)
-const lastPointer = reactive({ x: 0, y: 0, time: 0 })
 
 const CLICK_THRESHOLD = 5
 const FRICTION = 0.92
@@ -64,14 +66,16 @@ let raf: number | null = null
 const viewW = ref(0)
 const viewH = ref(0)
 
+// Reactive output — only updated when tiles actually change
+const renderedOffset = reactive({ x: 0, y: 0 })
+
 function mod(n: number, m: number) {
   return ((n % m) + m) % m
 }
 
-const baseX = computed(() => -mod(-smoothOffset.x, canvasW.value))
-const baseY = computed(() => -mod(-smoothOffset.y, canvasH.value))
+const baseX = computed(() => -mod(-renderedOffset.x, canvasW.value))
+const baseY = computed(() => -mod(-renderedOffset.y, canvasH.value))
 
-// Only render tiles that actually overlap the viewport (typically 1-4)
 const activeTiles = computed(() => {
   const w = canvasW.value
   const h = canvasH.value
@@ -84,7 +88,6 @@ const activeTiles = computed(() => {
     for (let gx = -1; gx <= 1; gx++) {
       const tx = bx + gx * w
       const ty = by + gy * h
-      // Skip tiles fully off-screen
       if (tx + w < -PADDING || tx > vw + PADDING) continue
       if (ty + h < -PADDING || ty > vh + PADDING) continue
       result.push({ key: `${gx}_${gy}`, tx, ty })
@@ -93,7 +96,6 @@ const activeTiles = computed(() => {
   return result
 })
 
-// --- Visibility check for lazy loading ---
 function isCardVisibleInTile(
   project: { x: number, y: number, width: number, height: number },
   tile: { tx: number, ty: number },
@@ -109,31 +111,37 @@ function isCardVisibleInTile(
   )
 }
 
-// --- Animation loop (starts/stops as needed) ---
+// Animation loop — updates raw vars, syncs to reactive only when needed
 function animate() {
   if (isDragging.value) {
-    smoothOffset.x += (targetOffset.x - smoothOffset.x) * LERP
-    smoothOffset.y += (targetOffset.y - smoothOffset.y) * LERP
+    _smoothX += (_targetX - _smoothX) * LERP
+    _smoothY += (_targetY - _smoothY) * LERP
   } else {
-    if (Math.abs(velocity.x) > MIN_VELOCITY || Math.abs(velocity.y) > MIN_VELOCITY) {
-      targetOffset.x += velocity.x
-      targetOffset.y += velocity.y
-      velocity.x *= FRICTION
-      velocity.y *= FRICTION
+    if (Math.abs(_velX) > MIN_VELOCITY || Math.abs(_velY) > MIN_VELOCITY) {
+      _targetX += _velX
+      _targetY += _velY
+      _velX *= FRICTION
+      _velY *= FRICTION
     }
-    smoothOffset.x += (targetOffset.x - smoothOffset.x) * LERP
-    smoothOffset.y += (targetOffset.y - smoothOffset.y) * LERP
+    _smoothX += (_targetX - _smoothX) * LERP
+    _smoothY += (_targetY - _smoothY) * LERP
 
-    // Stop loop when fully converged
-    const dx = Math.abs(targetOffset.x - smoothOffset.x)
-    const dy = Math.abs(targetOffset.y - smoothOffset.y)
-    if (dx < CONVERGE_THRESHOLD && dy < CONVERGE_THRESHOLD && Math.abs(velocity.x) < MIN_VELOCITY && Math.abs(velocity.y) < MIN_VELOCITY) {
-      smoothOffset.x = targetOffset.x
-      smoothOffset.y = targetOffset.y
+    const dx = Math.abs(_targetX - _smoothX)
+    const dy = Math.abs(_targetY - _smoothY)
+    if (dx < CONVERGE_THRESHOLD && dy < CONVERGE_THRESHOLD && Math.abs(_velX) < MIN_VELOCITY && Math.abs(_velY) < MIN_VELOCITY) {
+      _smoothX = _targetX
+      _smoothY = _targetY
+      renderedOffset.x = _smoothX
+      renderedOffset.y = _smoothY
       raf = null
       return
     }
   }
+
+  // Sync to reactive state (triggers Vue recomputation)
+  renderedOffset.x = _smoothX
+  renderedOffset.y = _smoothY
+
   raf = requestAnimationFrame(animate)
 }
 
@@ -149,34 +157,34 @@ function onPointerDown(e: PointerEvent) {
   ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
   isDragging.value = true
   dragDistance.value = 0
-  velocity.x = 0
-  velocity.y = 0
-  dragStart.x = e.clientX
-  dragStart.y = e.clientY
-  dragStartOffset.x = targetOffset.x
-  dragStartOffset.y = targetOffset.y
-  lastPointer.x = e.clientX
-  lastPointer.y = e.clientY
-  lastPointer.time = performance.now()
+  _velX = 0
+  _velY = 0
+  _dragStartX = e.clientX
+  _dragStartY = e.clientY
+  _dragStartOffX = _targetX
+  _dragStartOffY = _targetY
+  _lastPtrX = e.clientX
+  _lastPtrY = e.clientY
+  _lastPtrTime = performance.now()
   ensureAnimating()
 }
 
 function onPointerMove(e: PointerEvent) {
   if (!isDragging.value) return
-  const dx = e.clientX - dragStart.x
-  const dy = e.clientY - dragStart.y
+  const dx = e.clientX - _dragStartX
+  const dy = e.clientY - _dragStartY
   dragDistance.value = Math.sqrt(dx * dx + dy * dy)
-  targetOffset.x = dragStartOffset.x + dx
-  targetOffset.y = dragStartOffset.y + dy
+  _targetX = _dragStartOffX + dx
+  _targetY = _dragStartOffY + dy
   const now = performance.now()
-  const dt = now - lastPointer.time
+  const dt = now - _lastPtrTime
   if (dt > 0) {
-    velocity.x = (e.clientX - lastPointer.x) / dt * 16
-    velocity.y = (e.clientY - lastPointer.y) / dt * 16
+    _velX = (e.clientX - _lastPtrX) / dt * 16
+    _velY = (e.clientY - _lastPtrY) / dt * 16
   }
-  lastPointer.x = e.clientX
-  lastPointer.y = e.clientY
-  lastPointer.time = now
+  _lastPtrX = e.clientX
+  _lastPtrY = e.clientY
+  _lastPtrTime = now
 }
 
 function onPointerUp() {

@@ -45,6 +45,7 @@
             autoplay
             loop
             playsinline
+            preload="none"
             class="relative w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-[1.03]"
             @loadeddata="onVideoReady"
             style="opacity: 0; transition: opacity 0.4s ease"
@@ -137,13 +138,17 @@ function openModal() {
   emit('open', props.project)
 }
 
-// --- Video lifecycle ---
+// --- Video lifecycle (H1: capped concurrent playback) ---
+const videoBudget = useVideobudget()
+const UNLOAD_DELAY = import.meta.client && window.innerWidth < 768 ? 2000 : 10000
+
 watch(() => props.visible, (visible) => {
   if (props.project.type !== 'video') return
-  if (visible) {
+  if (visible && videoBudget.canPlay(props.project.id)) {
     if (unloadTimer) { clearTimeout(unloadTimer); unloadTimer = null }
     if (!showVideo.value) {
       showVideo.value = true
+      videoBudget.register(props.project.id)
     } else {
       nextTick(() => videoEl.value?.play().catch(() => {}))
     }
@@ -151,8 +156,9 @@ watch(() => props.visible, (visible) => {
     videoEl.value?.pause()
     unloadTimer = setTimeout(() => {
       showVideo.value = false
+      videoBudget.unregister(props.project.id)
       unloadTimer = null
-    }, import.meta.client && window.innerWidth < 768 ? 2000 : 10000)
+    }, visible ? UNLOAD_DELAY : UNLOAD_DELAY) // even if visible but over budget, unload after delay
   }
 }, { immediate: true })
 
@@ -161,6 +167,7 @@ function onVideoReady(e: Event) {
 }
 
 onUnmounted(() => {
+  videoBudget.unregister(props.project.id)
   if (unloadTimer) clearTimeout(unloadTimer)
 })
 </script>

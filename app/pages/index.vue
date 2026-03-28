@@ -23,14 +23,15 @@
         :projects="projects"
         v-slot="{ isVisible }"
       >
-        <ProjectCard
-          v-for="project in projects"
-          :key="project.id"
-          v-show="filter === 'all' || project.type === filter"
-          :project="project"
-          :visible="isVisible(project)"
-          @open="openProject"
-        />
+        <template v-for="project in projects" :key="project.id">
+          <ProjectCard
+            v-if="isVisible(project)"
+            v-show="filter === 'all' || project.type === filter"
+            :project="project"
+            :visible="true"
+            @open="openProject"
+          />
+        </template>
       </SandboxCanvas>
 
       <MasonryView

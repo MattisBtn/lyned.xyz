@@ -150,48 +150,68 @@ function triggerGlitch() {
   setTimeout(() => { glitch.value = false }, 80)
 }
 
-// --- Cyberpunk boot sound (uses existing click/open sounds + synth) ---
-function bootSound() {
-  // Play the existing click.mp3 as rhythmic ticks synced with progress
-  const click = new Audio('/sounds/click.mp3')
-  const open = new Audio('/sounds/open.mp3')
-  const close = new Audio('/sounds/close.mp3')
+// --- Cyberpunk boot sound (AudioContext with shared buffers) ---
+let bootCtx: AudioContext | null = null
 
-  // Preload
-  click.preload = 'auto'
-  open.preload = 'auto'
-  close.preload = 'auto'
+async function loadBuffer(ctx: AudioContext, url: string): Promise<AudioBuffer | null> {
+  try {
+    const res = await fetch(url)
+    const data = await res.arrayBuffer()
+    return await ctx.decodeAudioData(data)
+  } catch { return null }
+}
 
-  // Phase 2 (0.8s): play open sound on logo reveal
-  setTimeout(() => {
-    open.volume = 0.3
-    open.play().catch(() => {})
-  }, 800)
+function playBuffer(ctx: AudioContext, buffer: AudioBuffer, volume: number, rate: number = 1) {
+  const source = ctx.createBufferSource()
+  const gain = ctx.createGain()
+  source.buffer = buffer
+  source.playbackRate.value = rate
+  gain.gain.value = volume
+  source.connect(gain).connect(ctx.destination)
+  source.start()
+}
 
-  // Phase 3 (2.4s–5.5s): click ticks that accelerate with the progress bar
-  const tickTimes = [
-    2400, 2700, 2950, 3150, 3320, 3470, 3600, 3710,
-    3810, 3900, 3980, 4050, 4110, 4165, 4215, 4260,
-    4300, 4340, 4380, 4420, 4460, 4500, 4540, 4580,
-    4630, 4690, 4760, 4850, 4960, 5100, 5300,
-  ]
+async function bootSound() {
+  try {
+    bootCtx = new AudioContext()
+    const [clickBuf, openBuf, closeBuf] = await Promise.all([
+      loadBuffer(bootCtx, '/sounds/click.mp3'),
+      loadBuffer(bootCtx, '/sounds/open.mp3'),
+      loadBuffer(bootCtx, '/sounds/close.mp3'),
+    ])
 
-  tickTimes.forEach((t, i) => {
-    setTimeout(() => {
-      const tick = click.cloneNode() as HTMLAudioElement
-      // Volume increases slightly as progress advances, pitch feel from acceleration
-      tick.volume = 0.1 + (i / tickTimes.length) * 0.15
-      tick.playbackRate = 0.9 + (i / tickTimes.length) * 0.4
-      tick.play().catch(() => {})
-    }, t)
-  })
+    // Phase 2 (0.8s): open sound on logo reveal
+    if (openBuf) {
+      setTimeout(() => playBuffer(bootCtx!, openBuf, 0.3), 800)
+    }
 
-  // Phase 5 (5.8s): close sound as completion
-  setTimeout(() => {
-    close.volume = 0.4
-    close.playbackRate = 0.8
-    close.play().catch(() => {})
-  }, 5800)
+    // Phase 3 (2.4s–5.5s): accelerating click ticks via shared buffer
+    if (clickBuf) {
+      const tickTimes = [
+        2400, 2700, 2950, 3150, 3320, 3470, 3600, 3710,
+        3810, 3900, 3980, 4050, 4110, 4165, 4215, 4260,
+        4300, 4340, 4380, 4420, 4460, 4500, 4540, 4580,
+        4630, 4690, 4760, 4850, 4960, 5100, 5300,
+      ]
+      tickTimes.forEach((t, i) => {
+        setTimeout(() => {
+          const vol = 0.1 + (i / tickTimes.length) * 0.15
+          const rate = 0.9 + (i / tickTimes.length) * 0.4
+          playBuffer(bootCtx!, clickBuf, vol, rate)
+        }, t)
+      })
+    }
+
+    // Phase 5 (5.8s): close sound as completion
+    if (closeBuf) {
+      setTimeout(() => playBuffer(bootCtx!, closeBuf, 0.4, 0.8), 5800)
+    }
+
+    // Cleanup
+    setTimeout(() => { bootCtx?.close(); bootCtx = null }, 7500)
+  } catch {
+    // Silent fallback
+  }
 }
 
 const timers: ReturnType<typeof setTimeout>[] = []
