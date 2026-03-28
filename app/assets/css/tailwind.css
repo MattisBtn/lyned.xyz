@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* === TT Lakes Neue === */
+@font-face {
+  font-family: 'TT Lakes Neue';
+  src: url('~/assets/fonts/tt-lakes-neue-light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Lakes Neue';
+  src: url('~/assets/fonts/tt-lakes-neue-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Lakes Neue';
+  src: url('~/assets/fonts/tt-lakes-neue-medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'TT Lakes Neue';
+  src: url('~/assets/fonts/tt-lakes-neue-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* === Tailwind theme === */
+@theme {
+  --font-sans: 'TT Lakes Neue', system-ui, sans-serif;
+}
+
+/* === Marathon Cursors === */
+* {
+  cursor: url('/cursors/default.png') 4 2, default;
+}
+
+a, button, [role="button"], [type="button"], [type="submit"], .cursor-pointer {
+  cursor: url('/cursors/pointer.png') 10 4, pointer;
+}
+
+.cursor-grab {
+  cursor: url('/cursors/grabbing.png') 16 16, grab !important;
+}
+
+.cursor-grabbing {
+  cursor: url('/cursors/grab.png') 16 16, grabbing !important;
+}

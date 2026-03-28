@@ -10,7 +10,6 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 
 // --- Shader sources ---
 
-// Pass 1: Animated FBM clouds (adapted from prgm1.frag)
 const cloudsFragSrc = `#version 300 es
 precision highp float;
 
@@ -23,7 +22,6 @@ const float PI = acos(-1.0);
 const float TAU = PI * 2.0;
 const mat2 m2 = mat2(0.80, -0.60, 0.60, 0.80);
 
-// Smooth hash-based noise (no texture needed)
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
   p3 += dot(p3, p3.yzx + 33.33);
@@ -33,7 +31,6 @@ float hash(vec2 p) {
 float noise(vec2 x) {
   vec2 p = floor(x);
   vec2 f = fract(x);
-  // Quintic interpolation for smoother results (closer to texture sampling)
   f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
   float a = hash(p);
   float b = hash(p + vec2(1.0, 0.0));
@@ -60,7 +57,6 @@ vec3 clouds(vec2 uv) {
   r.y = fbm(uv + q + vec2(8.3, 2.8) + 0.21 * t * 0.25);
   float f = fbm(uv + r);
 
-  // Original palette from Marco Gomez
   vec3 color = mix(vec3(1.0, 1.0, 1.0), vec3(0.3, 1.6, 1.6), clamp((f * f) * 2.0, 0.0, 1.0));
   color = mix(color, vec3(0.4, 0.2, 0.16), clamp(length(q), 0.0, 1.0));
   color = mix(color, vec3(0.4, 0.7, 3.0), clamp(length(r.x), 0.0, 1.0));
@@ -74,7 +70,6 @@ void main(void) {
   vec2 p = -1.0 + 2.0 * uv;
   p.x -= uTime * 0.0125;
 
-  // Gaussian grain
   vec2 ps = vec2(1.0) / uResolution.xy;
   vec2 guv = gl_FragCoord.xy * ps;
   float seed = dot(guv, vec2(12.9898, 78.233));
@@ -88,7 +83,6 @@ void main(void) {
 }
 `
 
-// Pass 2: Dithering (adapted from prgm2.frag)
 const ditherFragSrc = `#version 300 es
 precision highp float;
 
@@ -97,7 +91,6 @@ uniform vec2 uResolution;
 
 out vec4 fragColor;
 
-// 8x8 Bayer matrix for ordered dithering
 const int bayerMatrix[64] = int[64](
    0, 32,  8, 40,  2, 34, 10, 42,
   48, 16, 56, 24, 50, 18, 58, 26,
@@ -110,7 +103,6 @@ const int bayerMatrix[64] = int[64](
 );
 
 void main(void) {
-  // Color is sampled from pixelized blocks (like original)
   float pixelSize = 4.0;
   vec2 pPixel = floor(gl_FragCoord.xy / pixelSize);
   vec2 pRes = floor(uResolution.xy / pixelSize);
@@ -118,8 +110,6 @@ void main(void) {
 
   vec4 color = texture(uCloudTexture, pUV);
 
-  // But dithering operates per REAL pixel (not per block)
-  // This replicates: tuv = gl_FragCoord.xy / 8.0 * 17.0; tuv = fract(tuv);
   ivec2 bayerCoord = ivec2(mod(floor(gl_FragCoord.xy), 8.0));
   float dither = float(bayerMatrix[bayerCoord.y * 8 + bayerCoord.x]) / 64.0;
 
@@ -132,7 +122,6 @@ void main(void) {
 }
 `
 
-// Simple fullscreen quad vertex shader
 const vertSrc = `#version 300 es
 in vec2 aPosition;
 void main() {
@@ -141,7 +130,8 @@ void main() {
 `
 
 function createShader(gl: WebGL2RenderingContext, type: number, source: string) {
-  const shader = gl.createShader(type)!
+  const shader = gl.createShader(type)
+  if (!shader) return null
   gl.shaderSource(shader, source)
   gl.compileShader(shader)
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
@@ -152,12 +142,12 @@ function createShader(gl: WebGL2RenderingContext, type: number, source: string) 
   return shader
 }
 
-function createProgram(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: string) {
-  const vert = createShader(gl, gl.VERTEX_SHADER, vertSrc)
-  const frag = createShader(gl, gl.FRAGMENT_SHADER, fragSrc)
+function createProgram(gl: WebGL2RenderingContext, vs: string, fs: string) {
+  const vert = createShader(gl, gl.VERTEX_SHADER, vs)
+  const frag = createShader(gl, gl.FRAGMENT_SHADER, fs)
   if (!vert || !frag) return null
-
-  const program = gl.createProgram()!
+  const program = gl.createProgram()
+  if (!program) return null
   gl.attachShader(program, vert)
   gl.attachShader(program, frag)
   gl.linkProgram(program)
@@ -168,35 +158,76 @@ function createProgram(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: str
   return program
 }
 
+// --- Top-level state for cleanup (M6 fix) ---
+let raf: number | null = null
+let glCtx: WebGL2RenderingContext | null = null
+let resources: {
+  cloudsProg: WebGLProgram
+  ditherProg: WebGLProgram
+  fb: WebGLFramebuffer
+  fbTex: WebGLTexture
+  quadBuf: WebGLBuffer
+  quadVAO: WebGLVertexArrayObject
+} | null = null
+
+function stopRendering() {
+  if (raf !== null) {
+    cancelAnimationFrame(raf)
+    raf = null
+  }
+}
+
+function cleanup() {
+  stopRendering()
+  if (glCtx && resources) {
+    glCtx.deleteProgram(resources.cloudsProg)
+    glCtx.deleteProgram(resources.ditherProg)
+    glCtx.deleteFramebuffer(resources.fb)
+    glCtx.deleteTexture(resources.fbTex)
+    glCtx.deleteBuffer(resources.quadBuf)
+    glCtx.deleteVertexArray(resources.quadVAO)
+    resources = null
+  }
+}
+
 onMounted(() => {
-  const cvs = canvas.value!
-  const gl = cvs.getContext('webgl2', { alpha: false, antialias: false })!
+  const cvs = canvas.value
+  if (!cvs) return
+
+  const gl = cvs.getContext('webgl2', { alpha: false, antialias: false })
   if (!gl) {
     console.error('WebGL2 not supported')
     return
   }
+  glCtx = gl
 
-  // Programs
-  const cloudsProg = createProgram(gl, vertSrc, cloudsFragSrc)!
-  const ditherProg = createProgram(gl, vertSrc, ditherFragSrc)!
+  // Programs (with null guards)
+  const cloudsProg = createProgram(gl, vertSrc, cloudsFragSrc)
+  const ditherProg = createProgram(gl, vertSrc, ditherFragSrc)
+  if (!cloudsProg || !ditherProg) {
+    console.error('Shader programs failed to compile')
+    return
+  }
 
   // Fullscreen quad
-  const quadVAO = gl.createVertexArray()
+  const quadVAO = gl.createVertexArray()!
   gl.bindVertexArray(quadVAO)
-  const quadBuf = gl.createBuffer()
+  const quadBuf = gl.createBuffer()!
   gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf)
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW)
 
   const aPos1 = gl.getAttribLocation(cloudsProg, 'aPosition')
   const aPos2 = gl.getAttribLocation(ditherProg, 'aPosition')
 
-  // Framebuffer for pass 1
-  let fbTex: WebGLTexture
-  let fb: WebGLFramebuffer
+  // Framebuffer
+  let fbTex: WebGLTexture = gl.createTexture()!
+  let fb: WebGLFramebuffer = gl.createFramebuffer()!
+
+  resources = { cloudsProg, ditherProg, fb, fbTex, quadBuf, quadVAO }
 
   function setupFramebuffer(w: number, h: number) {
-    if (fbTex) gl.deleteTexture(fbTex)
-    if (fb) gl.deleteFramebuffer(fb)
+    gl.deleteTexture(fbTex)
+    gl.deleteFramebuffer(fb)
 
     fbTex = gl.createTexture()!
     gl.bindTexture(gl.TEXTURE_2D, fbTex)
@@ -210,6 +241,11 @@ onMounted(() => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb)
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fbTex, 0)
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+
+    if (resources) {
+      resources.fb = fb
+      resources.fbTex = fbTex
+    }
   }
 
   // Uniforms
@@ -218,7 +254,6 @@ onMounted(() => {
   const uResDither = gl.getUniformLocation(ditherProg, 'uResolution')
   const uTexDither = gl.getUniformLocation(ditherProg, 'uCloudTexture')
 
-  // Resize
   let w = 0, h = 0
   function resize() {
     const dpr = Math.min(window.devicePixelRatio, 2)
@@ -233,8 +268,6 @@ onMounted(() => {
     }
   }
 
-  // Animation loop
-  let raf: number
   const startTime = performance.now()
 
   function render() {
@@ -268,18 +301,41 @@ onMounted(() => {
     raf = requestAnimationFrame(render)
   }
 
+  // C1: Pause/resume on tab visibility
+  function onVisibilityChange() {
+    if (document.hidden) {
+      stopRendering()
+    } else {
+      if (raf === null) raf = requestAnimationFrame(render)
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+
+  // C2: WebGL context loss/restore
+  function onContextLost(e: Event) {
+    e.preventDefault()
+    stopRendering()
+  }
+  function onContextRestored() {
+    // Re-init would require re-creating everything — for now just reload
+    window.location.reload()
+  }
+  cvs.addEventListener('webglcontextlost', onContextLost)
+  cvs.addEventListener('webglcontextrestored', onContextRestored)
+
+  // Start
   render()
 
+  // Store extra cleanup refs
   onUnmounted(() => {
-    cancelAnimationFrame(raf)
-    gl.deleteProgram(cloudsProg)
-    gl.deleteProgram(ditherProg)
-    gl.deleteFramebuffer(fb)
-    gl.deleteTexture(fbTex)
-    gl.deleteBuffer(quadBuf)
-    gl.deleteVertexArray(quadVAO)
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    cvs.removeEventListener('webglcontextlost', onContextLost)
+    cvs.removeEventListener('webglcontextrestored', onContextRestored)
   })
 })
+
+// M6: Top-level cleanup — always runs even if onMounted bailed early
+onUnmounted(cleanup)
 </script>
 
 <style scoped>
