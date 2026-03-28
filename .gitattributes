@@ -1,1 +1,4 @@
+public/assets/graphic/*.webp filter=lfs diff=lfs merge=lfs -text
+public/assets/motion/*.mp4 filter=lfs diff=lfs merge=lfs -text
+public/assets/motion/thumbs/*.webp filter=lfs diff=lfs merge=lfs -text
 public/assets/** !text !filter !merge !diff
