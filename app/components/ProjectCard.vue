@@ -10,7 +10,7 @@
     @keydown.space.prevent="handleClick"
   >
     <!-- Card frame -->
-    <div class="relative border border-white/[0.06] bg-white/[0.02] transition-all duration-300 hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.04)] focus-within:border-white/20 card-clip">
+    <div class="relative border border-white/10 bg-black/30 transition-all duration-300 hover:border-white/25 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] focus-within:border-white/25 card-clip">
 
       <!-- Scan line overlay -->
       <div class="absolute inset-0 pointer-events-none z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 scan-lines" />
@@ -59,11 +59,11 @@
       </div>
 
       <!-- Info bar -->
-      <div class="border-t border-white/[0.06] px-3 py-2 flex items-center justify-between gap-3">
-        <span class="font-sans text-[10px] text-white/50 uppercase tracking-[0.15em] truncate">{{ project.title }}</span>
+      <div class="border-t border-white/10 bg-black/50 px-3 py-2 flex items-center justify-between gap-3">
+        <span class="font-sans text-[10px] text-white/80 uppercase tracking-[0.15em] truncate">{{ project.title }}</span>
         <div class="flex items-center gap-1.5 shrink-0">
-          <span class="font-sans text-[9px] text-white/30 uppercase">{{ project.type === 'video' ? 'MP4' : 'PNG' }}</span>
-          <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400/80' : 'bg-white/30'" />
+          <span class="font-sans text-[9px] text-white/50 uppercase">{{ project.type === 'video' ? 'MP4' : 'PNG' }}</span>
+          <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400' : 'bg-white/40'" />
         </div>
       </div>
     </div>
@@ -87,18 +87,14 @@ watch(() => props.visible, (visible) => {
   if (props.project.type !== 'video') return
 
   if (visible) {
-    // Cancel pending unload
     if (unloadTimer) { clearTimeout(unloadTimer); unloadTimer = null }
 
     if (!showVideo.value) {
-      // First time visible: mount the video
       showVideo.value = true
     } else {
-      // Already mounted: resume
       nextTick(() => videoEl.value?.play().catch(() => {}))
     }
   } else {
-    // Pause immediately
     videoEl.value?.pause()
 
     // Unload after 10s of being off-screen
@@ -107,7 +103,7 @@ watch(() => props.visible, (visible) => {
       unloadTimer = null
     }, 10000)
   }
-})
+}, { immediate: true })
 
 function onVideoReady(e: Event) {
   (e.target as HTMLVideoElement).style.opacity = '1'
