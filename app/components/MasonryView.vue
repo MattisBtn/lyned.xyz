@@ -30,12 +30,15 @@
           </div>
 
           <!-- Info bar -->
-          <div class="border-t border-white/10 bg-black/50 px-2.5 py-1.5 flex items-center justify-between gap-2">
-            <span class="text-[9px] md:text-[10px] text-white/80 uppercase tracking-[0.12em] truncate">{{ project.title }}</span>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <span class="text-[8px] md:text-[9px] text-white/40 uppercase">{{ project.type === 'video' ? 'MP4' : 'WEBP' }}</span>
-              <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400' : 'bg-white/40'" />
+          <div class="border-t border-white/10 bg-black/50 px-2.5 py-1.5">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[9px] md:text-[10px] text-white/80 uppercase tracking-[0.12em] truncate">{{ project.title }}</span>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="text-[8px] md:text-[9px] text-white/40 uppercase">{{ project.type === 'video' ? 'MP4' : 'WEBP' }}</span>
+                <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400' : 'bg-white/40'" />
+              </div>
             </div>
+            <p v-if="project.description" class="text-[8px] md:text-[9px] text-white/30 truncate mt-1 normal-case tracking-normal">{{ project.description }}</p>
           </div>
         </div>
       </div>

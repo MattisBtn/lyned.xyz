@@ -11,8 +11,22 @@ function seededRandom(seed: number) {
 export default defineEventHandler(async (event) => {
   checkAdminAuth(event)
 
-  const { listR2Objects, putJsonToR2 } = await import('~~/server/lib/r2')
+  const { listR2Objects, putJsonToR2, getFromR2 } = await import('~~/server/lib/r2')
   const PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
+
+  // Load existing projects to preserve metadata (description, link)
+  let existingMeta: Record<string, { description?: string, link?: string }> = {}
+  try {
+    const existingJson = await getFromR2('projects.json')
+    if (existingJson) {
+      const existing = JSON.parse(existingJson)
+      for (const p of existing) {
+        if (p.description || p.link) {
+          existingMeta[p.id] = { description: p.description, link: p.link }
+        }
+      }
+    }
+  } catch { /* no existing data */ }
 
   const allKeys = await listR2Objects()
   const graphic = allKeys.filter(k => k.startsWith('graphic/') && k.endsWith('.webp'))
@@ -53,7 +67,7 @@ export default defineEventHandler(async (event) => {
     ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
 
-  const GAP = 100, CANVAS_W = 3000, MARGIN = 100
+  const GAP = 160, CANVAS_W = 4500, MARGIN = 150
   const placed: any[] = []
 
   function overlaps(rect: any) {
@@ -74,7 +88,7 @@ export default defineEventHandler(async (event) => {
 
     const candidates = [{ x: MARGIN, y: MARGIN }]
     for (const p of placed) {
-      const ex = Math.round(rand() * 120), ey = Math.round(rand() * 120)
+      const ex = Math.round(rand() * 200), ey = Math.round(rand() * 200)
       candidates.push({ x: p.x + p.width + GAP + ex, y: p.y })
       candidates.push({ x: p.x, y: p.y + p.height + GAP + ey })
       candidates.push({ x: p.x + p.width + GAP + ex, y: p.y + Math.round(p.height * 0.3) })
@@ -94,7 +108,8 @@ export default defineEventHandler(async (event) => {
     const noisy = { x: fx, y: fy, width: w, height }
     const ok = !overlaps(noisy) && fx + w <= CANVAS_W
 
-    placed.push({ ...item, x: ok ? fx : pos.x, y: ok ? fy : pos.y, width: w, height })
+    const meta = existingMeta[item.id] || {}
+    placed.push({ ...item, ...meta, x: ok ? fx : pos.x, y: ok ? fy : pos.y, width: w, height })
   }
 
   await putJsonToR2('projects.json', placed)

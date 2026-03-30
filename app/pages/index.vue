@@ -73,9 +73,17 @@ import type { ViewMode } from '~/components/ViewToggle.vue'
 
 const activeProject = ref<Project | null>(null)
 const filter = ref<FilterValue>('all')
-const viewMode = ref<ViewMode>('canvas')
+const isMobile = useIsMobile()
+const viewMode = ref<ViewMode>(import.meta.client && window.innerWidth < 768 ? 'masonry' : 'canvas')
 const viewTransition = ref('view-fade')
 const sound = useSound()
+
+// Force masonry when viewport crosses into mobile (e.g. orientation change)
+watch(isMobile, (mobile) => {
+  if (mobile && viewMode.value === 'canvas') {
+    viewMode.value = 'masonry'
+  }
+})
 
 // Track direction for transition
 watch(viewMode, (to, from) => {

@@ -56,6 +56,43 @@
             />
           </div>
 
+          <!-- Info toggle button (top right of frame) -->
+          <button
+            v-if="hasInfo"
+            type="button"
+            class="absolute top-12 right-3 z-20 w-8 h-8 flex items-center justify-center border bg-black/70 backdrop-blur-md hover:bg-black/80 transition-all duration-200 clip-corner cursor-pointer"
+            :class="showInfo ? 'border-white/30 text-white/90' : 'border-white/15 text-white/40 hover:border-white/30 hover:text-white/70'"
+            aria-label="Toggle project info"
+            @click="showInfo = !showInfo"
+          >
+            <span class="font-sans text-xs font-medium select-none">i</span>
+          </button>
+
+          <!-- Info panel overlay -->
+          <Transition name="info">
+            <div
+              v-if="showInfo && hasInfo"
+              class="absolute inset-0 z-10 flex items-end pointer-events-none"
+              style="top: 40px; bottom: 32px"
+            >
+              <div class="w-full pointer-events-auto bg-gradient-to-t from-black/90 via-black/70 to-transparent px-5 py-5 space-y-3">
+                <p v-if="project.description" class="font-sans text-[11px] md:text-xs text-white/70 leading-relaxed max-w-lg">{{ project.description }}</p>
+                <a
+                  v-if="safeLink"
+                  :href="safeLink"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1.5 font-sans text-[10px] text-white/40 uppercase tracking-[0.15em] hover:text-white/70 transition-colors"
+                >
+                  <svg class="w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                  {{ safeLink.replace(/^https?:\/\//, '') }}
+                </a>
+              </div>
+            </div>
+          </Transition>
+
           <!-- Bottom bar -->
           <div class="border-t border-white/[0.06] px-4 py-2 flex items-center justify-between">
             <span class="font-sans text-[9px] text-white/20 uppercase tracking-[0.2em]">
@@ -77,13 +114,22 @@ import type { Project } from '~/data/projects'
 const props = defineProps<{ project: Project | null }>()
 const emit = defineEmits<{ close: [] }>()
 const closeBtn = ref<HTMLButtonElement | null>(null)
+const showInfo = ref(false)
+
+const safeLink = computed(() => {
+  const url = props.project?.link
+  return url && /^https?:\/\//i.test(url) ? url : null
+})
+
+const hasInfo = computed(() => !!(props.project?.description || safeLink.value))
 
 function close() {
   emit('close')
 }
 
-// Focus trap: move focus to close button when modal opens
+// Focus trap + reset info panel when modal opens/closes
 watch(() => props.project, (val) => {
+  showInfo.value = false
   if (val) {
     nextTick(() => closeBtn.value?.focus())
   }
@@ -104,6 +150,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
   clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px));
 }
 
+.clip-corner {
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+}
+
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.2s ease;
@@ -111,5 +161,15 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+.info-enter-active,
+.info-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.info-enter-from,
+.info-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 </style>

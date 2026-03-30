@@ -195,9 +195,9 @@ for (let i = shuffled.length - 1; i > 0; i--) {
   ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
 }
 
-const GAP = 100         // breathing room between cards
-const CANVAS_W = 3000   // target canvas width (wider = more airy)
-const MARGIN = 100      // edge margin
+const GAP = 160         // breathing room between cards
+const CANVAS_W = 4500   // target canvas width (wider = more airy)
+const MARGIN = 150      // edge margin
 
 /**
  * Place each item by scanning candidate positions and picking the one
@@ -224,8 +224,8 @@ for (const item of shuffled) {
 
   for (const p of placed) {
     // Variable extra spacing (0-80px) for airy, organic feel
-    const extraX = Math.round(rand() * 120)
-    const extraY = Math.round(rand() * 120)
+    const extraX = Math.round(rand() * 200)
+    const extraY = Math.round(rand() * 200)
     // Right of placed item
     candidates.push({ x: p.x + p.width + GAP + extraX, y: p.y })
     // Below placed item

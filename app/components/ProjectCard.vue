@@ -63,12 +63,15 @@
       </div>
 
       <!-- Info bar -->
-      <div class="border-t border-white/10 bg-black/50 px-3 py-2 flex items-center justify-between gap-3">
-        <span class="font-sans text-[10px] text-white/80 uppercase tracking-[0.15em] truncate">{{ project.title }}</span>
-        <div class="flex items-center gap-1.5 shrink-0">
-          <span class="font-sans text-[9px] text-white/50 uppercase">{{ project.type === 'video' ? 'MP4' : 'PNG' }}</span>
-          <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400' : 'bg-white/40'" />
+      <div class="border-t border-white/10 bg-black/50 px-3 py-2">
+        <div class="flex items-center justify-between gap-3">
+          <span class="font-sans text-[10px] text-white/80 uppercase tracking-[0.15em] truncate">{{ project.title }}</span>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="font-sans text-[9px] text-white/50 uppercase">{{ project.type === 'video' ? 'MP4' : 'PNG' }}</span>
+            <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400' : 'bg-white/40'" />
+          </div>
         </div>
+        <p v-if="project.description" class="font-sans text-[8px] text-white/30 truncate mt-1 normal-case tracking-normal">{{ project.description }}</p>
       </div>
     </div>
   </div>

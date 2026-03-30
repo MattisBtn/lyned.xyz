@@ -37,10 +37,15 @@
             />
           </div>
 
-          <!-- Title -->
-          <span class="flex-1 text-[11px] md:text-xs text-white/70 uppercase tracking-[0.1em] truncate group-hover:text-white/90 transition-colors">
-            {{ project.title }}
-          </span>
+          <!-- Title + Description -->
+          <div class="flex-1 min-w-0">
+            <span class="text-[11px] md:text-xs text-white/70 uppercase tracking-[0.1em] truncate group-hover:text-white/90 transition-colors block">
+              {{ project.title }}
+            </span>
+            <span v-if="project.description" class="text-[9px] text-white/30 truncate block mt-0.5 normal-case tracking-normal">
+              {{ project.description }}
+            </span>
+          </div>
 
           <!-- Index -->
           <span class="text-[9px] text-white/15 tabular-nums w-8 text-right hidden md:block">

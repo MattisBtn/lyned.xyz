@@ -163,15 +163,32 @@
             <div class="aspect-[4/3] bg-black/50 overflow-hidden">
               <img :src="asset.thumbnail" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
             </div>
-            <div class="px-2.5 py-2 flex items-center justify-between bg-black/40">
-              <span class="text-[9px] text-white/50 truncate pr-2">{{ asset.title }}</span>
-              <button
-                type="button"
-                class="text-[9px] text-red-400/40 hover:text-red-400 uppercase shrink-0 opacity-0 group-hover:opacity-100 transition-all"
-                @click.stop="deleteAsset(asset)"
-              >
-                Del
-              </button>
+            <div class="px-2.5 py-2 bg-black/40">
+              <div class="flex items-center justify-between">
+                <span class="text-[9px] text-white/50 truncate pr-2">{{ asset.title }}</span>
+                <div class="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    type="button"
+                    class="text-[9px] text-white/30 hover:text-white/70 uppercase"
+                    @click.stop="openEdit(asset)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="text-[9px] text-red-400/40 hover:text-red-400 uppercase"
+                    @click.stop="deleteAsset(asset)"
+                  >
+                    Del
+                  </button>
+                </div>
+              </div>
+              <div v-if="asset.description || asset.link" class="mt-1 flex items-center gap-1.5">
+                <div v-if="asset.description" class="w-1 h-1 rounded-full bg-white/20 shrink-0" />
+                <svg v-if="asset.link" class="w-2.5 h-2.5 text-white/20 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.02a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.343 8.55" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
@@ -198,20 +215,118 @@
               />
               <span v-else class="text-[9px] text-white/15 uppercase tracking-wider">MP4</span>
             </div>
-            <div class="px-2.5 py-2 flex items-center justify-between bg-black/40">
-              <span class="text-[9px] text-white/50 truncate pr-2">{{ asset.title }}</span>
-              <button
-                type="button"
-                class="text-[9px] text-red-400/40 hover:text-red-400 uppercase shrink-0 opacity-0 group-hover:opacity-100 transition-all"
-                @click.stop="deleteAsset(asset)"
-              >
-                Del
-              </button>
+            <div class="px-2.5 py-2 bg-black/40">
+              <div class="flex items-center justify-between">
+                <span class="text-[9px] text-white/50 truncate pr-2">{{ asset.title }}</span>
+                <div class="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                  <button
+                    type="button"
+                    class="text-[9px] text-white/30 hover:text-white/70 uppercase"
+                    @click.stop="openEdit(asset)"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    class="text-[9px] text-red-400/40 hover:text-red-400 uppercase"
+                    @click.stop="deleteAsset(asset)"
+                  >
+                    Del
+                  </button>
+                </div>
+              </div>
+              <div v-if="asset.description || asset.link" class="mt-1 flex items-center gap-1.5">
+                <div v-if="asset.description" class="w-1 h-1 rounded-full bg-white/20 shrink-0" />
+                <svg v-if="asset.link" class="w-2.5 h-2.5 text-white/20 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.02a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.343 8.55" />
+                </svg>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- ===== EDIT METADATA MODAL ===== -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div
+          v-if="editing"
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          @click.self="editing = null"
+          @keydown.escape="editing = null"
+        >
+          <div class="relative border border-white/[0.08] bg-[#0a0a0f] backdrop-blur-md clip-lg shadow-[0_0_60px_rgba(0,0,0,0.6)] w-full max-w-md mx-4">
+            <!-- Corner brackets -->
+            <div class="absolute -top-px -left-px w-5 h-5 border-t-2 border-l-2 border-white/25" />
+            <div class="absolute -top-px -right-px w-5 h-5 border-t-2 border-r-2 border-white/25" />
+            <div class="absolute -bottom-px -left-px w-5 h-5 border-b-2 border-l-2 border-white/25" />
+            <div class="absolute -bottom-px -right-px w-5 h-5 border-b-2 border-r-2 border-white/25" />
+
+            <!-- Top bar -->
+            <div class="border-b border-white/[0.06] px-4 py-2.5 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span class="text-[11px] text-white/60 uppercase tracking-[0.12em]">{{ editing.title }}</span>
+              </div>
+              <button
+                type="button"
+                class="text-[10px] text-white/30 uppercase tracking-[0.15em] hover:text-white/70 transition-colors cursor-pointer"
+                @click="editing = null"
+              >
+                [ESC]
+              </button>
+            </div>
+
+            <!-- Form -->
+            <div class="p-5 space-y-4">
+              <div>
+                <label class="block text-[9px] text-white/30 uppercase tracking-[0.2em] mb-2">Description</label>
+                <textarea
+                  v-model="editDescription"
+                  rows="3"
+                  placeholder="Project description (optional)"
+                  class="w-full bg-white/[0.03] border border-white/10 px-3 py-2.5 text-sm text-white/90 placeholder:text-white/20 outline-none focus:border-white/25 transition-colors resize-none"
+                />
+              </div>
+              <div>
+                <label class="block text-[9px] text-white/30 uppercase tracking-[0.2em] mb-2">Link</label>
+                <input
+                  v-model="editLink"
+                  type="url"
+                  placeholder="https://example.com (optional)"
+                  class="w-full bg-white/[0.03] border border-white/10 px-3 py-2.5 text-sm text-white/90 placeholder:text-white/20 outline-none focus:border-white/25 transition-colors"
+                />
+              </div>
+            </div>
+
+            <!-- Error + Bottom bar -->
+            <div class="border-t border-white/[0.06] px-4 py-3">
+              <Transition name="fade">
+                <p v-if="saveError" class="text-red-400/80 text-[9px] uppercase tracking-[0.15em] mb-3">{{ saveError }}</p>
+              </Transition>
+              <div class="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  class="px-4 py-2 text-[10px] uppercase tracking-[0.15em] text-white/40 hover:text-white/70 transition-colors"
+                  @click="editing = null"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class="px-4 py-2 text-[10px] uppercase tracking-[0.15em] border border-white/15 bg-white/[0.06] text-white/60 hover:bg-white/10 hover:text-white/90 hover:border-white/25 transition-all clip-sm"
+                  :class="saving ? 'opacity-50 pointer-events-none' : ''"
+                  @click="saveMetadata"
+                >
+                  {{ saving ? 'Saving...' : 'Save' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- ===== PREVIEW MODAL ===== -->
     <Teleport to="body">
@@ -288,9 +403,59 @@ const uploadCount = ref(0)
 const ingesting = ref(false)
 const ingestOutput = ref('')
 const preview = ref<{ src: string, type: string, title: string } | null>(null)
+const editing = ref<any | null>(null)
+const editDescription = ref('')
+const editLink = ref('')
+const saving = ref(false)
 
 function openPreview(asset: { src: string, type: string, title: string }) {
   preview.value = asset
+}
+
+function openEdit(asset: any) {
+  editing.value = asset
+  editDescription.value = asset.description || ''
+  editLink.value = asset.link || ''
+}
+
+const saveError = ref('')
+
+async function saveMetadata() {
+  if (!editing.value) return
+  saving.value = true
+  saveError.value = ''
+
+  const desc = editDescription.value || undefined
+  const lnk = editLink.value || undefined
+
+  // Validate link scheme client-side
+  if (lnk && !/^https?:\/\//i.test(lnk)) {
+    saveError.value = 'Link must start with http:// or https://'
+    saving.value = false
+    return
+  }
+
+  // Build payload with updated metadata (don't mutate local state yet)
+  const payload = projectsList.value.map((p: any) =>
+    p.id === editing.value.id ? { ...p, description: desc, link: lnk } : p
+  )
+
+  try {
+    await $fetch('/api/admin/save', {
+      method: 'POST',
+      body: { projects: payload },
+      headers: authHeaders(),
+    })
+    // Only update local state after server confirms
+    projectsList.value = payload
+    assets.graphic = payload.filter((p: any) => p.type === 'image')
+    assets.motion = payload.filter((p: any) => p.type === 'video')
+    editing.value = null
+  } catch (err: any) {
+    saveError.value = 'Save failed — please try again'
+    console.error('Save failed:', err)
+  }
+  saving.value = false
 }
 
 const assets = reactive<{ graphic: any[], motion: any[] }>({
@@ -428,10 +593,11 @@ async function runIngest() {
   ingesting.value = false
 }
 
-// M5: Global escape key for preview modal
+// M5: Global escape key for preview + edit modals
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && preview.value) {
-    preview.value = null
+  if (e.key === 'Escape') {
+    if (preview.value) preview.value = null
+    else if (editing.value) editing.value = null
   }
 }
 

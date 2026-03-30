@@ -32,12 +32,15 @@ export type ViewMode = 'canvas' | 'masonry' | 'list'
 const props = defineProps<{ modelValue: ViewMode }>()
 const emit = defineEmits<{ 'update:modelValue': [value: ViewMode] }>()
 const sound = useSound()
+const isMobile = useIsMobile()
 
-const modes = [
+const allModes = [
   { value: 'canvas' as const, label: 'Canvas View' },
   { value: 'masonry' as const, label: 'Masonry View' },
   { value: 'list' as const, label: 'List View' },
 ]
+
+const modes = computed(() => isMobile.value ? allModes.filter(m => m.value !== 'canvas') : allModes)
 
 function select(value: ViewMode) {
   if (value === props.modelValue) return
