@@ -45,14 +45,14 @@ export default defineEventHandler(async (event) => {
   const PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
 
   // Load existing projects to preserve metadata (description, link)
-  let existingMeta: Record<string, { description?: string, link?: string }> = {}
+  let existingMeta: Record<string, { description?: string, link?: string, multiFrame?: boolean }> = {}
   try {
     const existingJson = await getFromR2('projects.json')
     if (existingJson) {
       const existing = JSON.parse(existingJson)
       for (const p of existing) {
-        if (p.description || p.link) {
-          existingMeta[p.id] = { description: p.description, link: p.link }
+        if (p.description || p.link || p.multiFrame) {
+          existingMeta[p.id] = { description: p.description, link: p.link, multiFrame: p.multiFrame }
         }
       }
     }
@@ -109,10 +109,12 @@ export default defineEventHandler(async (event) => {
     } catch { /* skip */ }
   }))
 
-  // Assign aspectRatio to projects
+  // Assign aspectRatio and existing metadata to projects BEFORE placement
   for (const p of allProjects) {
     const ratio = ratioMap[p.id]
     if (ratio) (p as any).aspectRatio = ratio
+    const meta = existingMeta[p.id]
+    if (meta) Object.assign(p, meta)
   }
 
   // Organic placement
@@ -134,13 +136,24 @@ export default defineEventHandler(async (event) => {
     return false
   }
 
+  // Multi-frame cluster bounding box
+  const CLUSTER_W = 880, CLUSTER_H = 660
+
   for (const item of shuffled) {
-    const widths = [260, 280, 300, 320, 340]
-    const w = widths[Math.floor(rand() * widths.length)]
-    const h = item.type === 'video'
-      ? Math.round(w * (9 / 16) + (rand() - 0.5) * 20)
-      : Math.round(w * (0.7 + rand() * 0.4))
-    const height = Math.max(150, h) + 40
+    const isMulti = (item as any).multiFrame === true
+    let w: number, height: number
+
+    if (isMulti) {
+      w = CLUSTER_W
+      height = CLUSTER_H
+    } else {
+      const widths = [260, 280, 300, 320, 340]
+      w = widths[Math.floor(rand() * widths.length)]
+      const h = item.type === 'video'
+        ? Math.round(w * (9 / 16) + (rand() - 0.5) * 20)
+        : Math.round(w * (0.7 + rand() * 0.4))
+      height = Math.max(150, h) + 40
+    }
 
     const candidates = [{ x: MARGIN, y: MARGIN }]
     for (const p of placed) {
@@ -151,8 +164,9 @@ export default defineEventHandler(async (event) => {
       candidates.push({ x: p.x + Math.round(p.width * 0.4), y: p.y + p.height + GAP + ey })
     }
 
+    const maxW = isMulti ? CANVAS_W + CLUSTER_W : CANVAS_W
     const valid = candidates
-      .filter(c => c.x + w <= CANVAS_W && c.x >= MARGIN && c.y >= MARGIN)
+      .filter(c => c.x + w <= maxW && c.x >= MARGIN && c.y >= MARGIN)
       .filter(c => !overlaps({ x: c.x, y: c.y, width: w, height }))
       .sort((a, b) => (a.y * 2 + a.x) - (b.y * 2 + b.x))
 
@@ -162,10 +176,9 @@ export default defineEventHandler(async (event) => {
     const ny = Math.round((rand() - 0.5) * nm * 2)
     const fx = Math.max(MARGIN, pos.x + nx), fy = Math.max(MARGIN, pos.y + ny)
     const noisy = { x: fx, y: fy, width: w, height }
-    const ok = !overlaps(noisy) && fx + w <= CANVAS_W
+    const ok = !overlaps(noisy) && fx + w <= maxW
 
-    const meta = existingMeta[item.id] || {}
-    placed.push({ ...item, ...meta, x: ok ? fx : pos.x, y: ok ? fy : pos.y, width: w, height })
+    placed.push({ ...item, x: ok ? fx : pos.x, y: ok ? fy : pos.y, width: w, height })
   }
 
   await putJsonToR2('projects.json', placed)

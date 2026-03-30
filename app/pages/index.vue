@@ -24,8 +24,15 @@
         v-slot="{ isVisible }"
       >
         <template v-for="project in projects" :key="project.id">
+          <MultiFrameCluster
+            v-if="project.multiFrame && isVisible(project)"
+            v-show="filter === 'all' || project.type === filter"
+            :project="project"
+            :visible="true"
+            @open="openProject"
+          />
           <ProjectCard
-            v-if="isVisible(project)"
+            v-else-if="isVisible(project)"
             v-show="filter === 'all' || project.type === filter"
             :project="project"
             :visible="true"

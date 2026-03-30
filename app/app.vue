@@ -39,10 +39,10 @@ function onPreloaderDone() {
 
   // Show desktop hint on mobile only, once per session
   // Delay to let preloader fade-out finish (0.8s transition)
-  if (import.meta.client && isMobile.value && !sessionStorage.getItem('desktop-hint')) {
+  if (import.meta.client && isMobile.value && !localStorage.getItem('desktop-hint')) {
     hintTimers.push(setTimeout(() => {
       showDesktopHint.value = true
-      sessionStorage.setItem('desktop-hint', '1')
+      localStorage.setItem('desktop-hint', '1')
       hintTimers.push(setTimeout(() => { showDesktopHint.value = false }, 4000))
     }, 1000))
   }

@@ -52,6 +52,9 @@
             {{ String(i + 1).padStart(2, '0') }}
           </span>
 
+          <!-- Multi-frame badge -->
+          <span v-if="project.multiFrame" class="text-[8px] text-white/25 uppercase border border-white/10 px-1.5 py-px hidden md:inline">6F</span>
+
           <!-- Format -->
           <span class="text-[9px] text-white/30 uppercase tracking-[0.15em] w-12 md:w-20 text-right">
             {{ project.type === 'video' ? 'MP4' : 'WEBP' }}

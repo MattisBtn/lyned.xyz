@@ -60,6 +60,13 @@
           <button
             type="button"
             class="px-4 py-2 text-[10px] uppercase tracking-[0.15em] border border-white/15 bg-black/50 hover:bg-white/[0.08] hover:border-white/25 transition-all text-white/50 hover:text-white/90 clip-sm"
+            @click="showFrameEditor = true"
+          >
+            Multi-Frame
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 text-[10px] uppercase tracking-[0.15em] border border-white/15 bg-black/50 hover:bg-white/[0.08] hover:border-white/25 transition-all text-white/50 hover:text-white/90 clip-sm"
             :class="ingesting ? 'opacity-50 pointer-events-none' : ''"
             @click="runIngest"
           >
@@ -247,6 +254,14 @@
       </div>
     </div>
 
+    <!-- ===== MULTI-FRAME EDITOR ===== -->
+    <MultiFrameEditor
+      :open="showFrameEditor"
+      :preview-thumb="multiFramePreviewThumb"
+      :token="token"
+      @close="showFrameEditor = false"
+    />
+
     <!-- ===== EDIT METADATA MODAL ===== -->
     <Teleport to="body">
       <Transition name="fade">
@@ -297,6 +312,20 @@
                   placeholder="https://example.com (optional)"
                   class="w-full bg-white/[0.03] border border-white/10 px-3 py-2.5 text-sm text-white/90 placeholder:text-white/20 outline-none focus:border-white/25 transition-colors"
                 />
+              </div>
+              <div v-if="editing?.type === 'video'" class="flex items-center gap-3">
+                <button
+                  type="button"
+                  class="relative w-8 h-4 border transition-all duration-200 clip-sm shrink-0"
+                  :class="editMultiFrame ? 'bg-white/15 border-white/25' : 'bg-white/[0.06] border-white/10'"
+                  @click="editMultiFrame = !editMultiFrame"
+                >
+                  <div
+                    class="absolute top-0.5 w-3 h-3 rounded-sm transition-all duration-200"
+                    :class="editMultiFrame ? 'left-[calc(100%-14px)] bg-emerald-400' : 'left-0.5 bg-white/30'"
+                  />
+                </button>
+                <span class="text-[9px] text-white/30 uppercase tracking-[0.2em]">Multi-Frame (6 frames in canvas)</span>
               </div>
             </div>
 
@@ -408,14 +437,24 @@ const editDescription = ref('')
 const editLink = ref('')
 const saving = ref(false)
 
+const showFrameEditor = ref(false)
+
+const multiFramePreviewThumb = computed(() => {
+  const mf = projectsList.value.find((p: any) => p.multiFrame)
+  return mf?.thumbnail || assets.motion[0]?.thumbnail || assets.graphic[0]?.thumbnail || null
+})
+
 function openPreview(asset: { src: string, type: string, title: string }) {
   preview.value = asset
 }
+
+const editMultiFrame = ref(false)
 
 function openEdit(asset: any) {
   editing.value = asset
   editDescription.value = asset.description || ''
   editLink.value = asset.link || ''
+  editMultiFrame.value = !!asset.multiFrame
 }
 
 const saveError = ref('')
@@ -435,10 +474,15 @@ async function saveMetadata() {
     return
   }
 
+  const multi = editMultiFrame.value || undefined
+
   // Build payload with updated metadata (don't mutate local state yet)
   const payload = projectsList.value.map((p: any) =>
-    p.id === editing.value.id ? { ...p, description: desc, link: lnk } : p
+    p.id === editing.value.id ? { ...p, description: desc, link: lnk, multiFrame: multi } : p
   )
+
+  // Detect if multiFrame changed (need ingest to recalculate dimensions)
+  const multiFrameChanged = !!editing.value.multiFrame !== !!multi
 
   try {
     await $fetch('/api/admin/save', {
@@ -451,6 +495,9 @@ async function saveMetadata() {
     assets.graphic = payload.filter((p: any) => p.type === 'image')
     assets.motion = payload.filter((p: any) => p.type === 'video')
     editing.value = null
+
+    // Auto-run ingest when multiFrame toggled (recalculates card dimensions)
+    if (multiFrameChanged) await runIngest()
   } catch (err: any) {
     saveError.value = 'Save failed — please try again'
     console.error('Save failed:', err)
@@ -593,11 +640,12 @@ async function runIngest() {
   ingesting.value = false
 }
 
-// M5: Global escape key for preview + edit modals
+// M5: Global escape key for modals
 function onKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     if (preview.value) preview.value = null
     else if (editing.value) editing.value = null
+    else if (showFrameEditor.value) showFrameEditor.value = false
   }
 }
 

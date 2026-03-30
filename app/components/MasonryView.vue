@@ -34,6 +34,7 @@
             <div class="flex items-center justify-between gap-2">
               <span class="text-[9px] md:text-[10px] text-white/80 uppercase tracking-[0.12em] truncate">{{ project.title }}</span>
               <div class="flex items-center gap-1.5 shrink-0">
+                <span v-if="project.multiFrame" class="text-[7px] md:text-[8px] text-white/30 uppercase border border-white/10 px-1 py-px">6F</span>
                 <span class="text-[8px] md:text-[9px] text-white/40 uppercase">{{ project.type === 'video' ? 'MP4' : 'WEBP' }}</span>
                 <div class="w-1.5 h-1.5 rounded-full" :class="project.type === 'video' ? 'bg-emerald-400' : 'bg-white/40'" />
               </div>
