@@ -3,10 +3,50 @@
     class="absolute"
     :style="{ left: `${project.x}px`, top: `${project.y}px`, width: `${bounds.width}px`, height: `${bounds.height}px` }"
   >
-    <!-- Frames — each styled like a ProjectCard -->
+    <!-- SVG clip-path: video only visible through frame rectangles -->
+    <svg class="absolute" width="0" height="0" aria-hidden="true">
+      <defs>
+        <clipPath :id="clipId">
+          <rect
+            v-for="(frame, i) in frames"
+            :key="i"
+            :x="frame.x"
+            :y="frame.y"
+            :width="frame.w"
+            :height="frame.h"
+          />
+        </clipPath>
+      </defs>
+    </svg>
+
+    <!-- Thumbnail fallback (clipped to frames) -->
+    <img
+      v-if="visible"
+      :src="project.thumbnail"
+      :alt="project.title"
+      loading="lazy"
+      draggable="false"
+      class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+      :style="{ clipPath: `url(#${clipId})` }"
+    />
+
+    <!-- Video layer (clipped to same frames, fades in over thumbnail) -->
+    <video
+      v-if="showVideo && project.type === 'video'"
+      ref="videoEl"
+      :src="project.src"
+      muted
+      loop
+      playsinline
+      class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-500"
+      :style="{ clipPath: `url(#${clipId})`, opacity: videoReady ? '1' : '0' }"
+      @canplay="onVideoReady"
+    />
+
+    <!-- Frame overlays (borders, corners, scan-lines, info bars) -->
     <div
       v-for="(frame, i) in frames"
-      :key="i"
+      :key="'frame-' + i"
       class="absolute group/frame cursor-pointer"
       :style="{
         left: `${frame.x}px`,
@@ -18,8 +58,9 @@
       @click="$emit('open', project)"
       @keydown.enter="$emit('open', project)"
     >
-      <div class="relative border border-white/10 bg-black/30 hover:border-white/25 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] transition-all duration-300 card-clip">
-
+      <div class="relative border border-white/10 hover:border-white/25 hover:shadow-[0_0_20px_rgba(255,255,255,0.06)] transition-all duration-300 card-clip pointer-events-auto"
+        :style="{ height: `${frame.h + 36}px` }"
+      >
         <!-- Scan line overlay -->
         <div class="absolute inset-0 pointer-events-none z-10 opacity-0 group-hover/frame:opacity-100 transition-opacity duration-500 scan-lines" />
 
@@ -29,41 +70,10 @@
         <div class="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-white/20 z-10" />
         <div class="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-white/20 z-10" />
 
-        <!-- Media -->
-        <div class="overflow-hidden relative" :style="{ height: `${frame.h}px` }">
-          <!-- Thumbnail -->
-          <img
-            v-if="visible"
-            :src="project.thumbnail"
-            :alt="project.title"
-            loading="lazy"
-            draggable="false"
-            class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-            :style="{
-              objectPosition: `${frame.cropX * 100}% ${frame.cropY * 100}%`,
-              transform: `scale(${frame.zoom})`,
-            }"
-          />
-          <!-- Video overlay -->
-          <video
-            v-if="visible && showVideo && project.type === 'video'"
-            :ref="(el: any) => { if (el) videoEls[i] = el }"
-            :src="project.src"
-            muted
-            loop
-            playsinline
-            class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-            :style="{
-              objectPosition: `${frame.cropX * 100}% ${frame.cropY * 100}%`,
-              transform: `scale(${frame.zoom})`,
-              opacity: videoReady ? '1' : '0',
-              transition: 'opacity 0.4s ease',
-            }"
-            @loadeddata="onVideoReady"
-          />
-        </div>
+        <!-- Transparent media area (video shows through from behind) -->
+        <div :style="{ height: `${frame.h}px` }" />
 
-        <!-- Info bar (same as ProjectCard) -->
+        <!-- Info bar -->
         <div class="border-t border-white/10 bg-black/50 px-3 py-2">
           <div class="flex items-center justify-between gap-3">
             <span class="font-sans text-[10px] text-white/80 uppercase tracking-[0.15em] truncate">{{ project.title }}</span>
@@ -87,21 +97,19 @@ defineEmits<{ open: [project: Project] }>()
 
 const { frames, bounds } = useMultiFramePreset()
 
-// Video lifecycle — single budget slot for all 6 frames
+// Unique clip-path ID per project (avoids SVG ID collisions)
+const clipId = computed(() => `mf-clip-${props.project.id}`)
+
+// Single video element — clipped by SVG clipPath to show through frames
+const videoEl = ref<HTMLVideoElement | null>(null)
 const showVideo = ref(false)
 const videoReady = ref(false)
-const videoEls: Record<number, HTMLVideoElement> = {}
 const videoBudget = useVideobudget()
 let unloadTimer: ReturnType<typeof setTimeout> | null = null
 
 function onVideoReady() {
   videoReady.value = true
-}
-
-function playAll() {
-  for (const el of Object.values(videoEls)) {
-    el?.play().catch(() => {})
-  }
+  videoEl.value?.play().catch(() => {})
 }
 
 watch(() => props.visible, (visible) => {
@@ -111,17 +119,15 @@ watch(() => props.visible, (visible) => {
     if (!showVideo.value) {
       showVideo.value = true
       videoBudget.register(props.project.id)
-      nextTick(() => playAll())
     } else {
-      playAll()
+      videoEl.value?.play().catch(() => {})
     }
   } else {
-    for (const el of Object.values(videoEls)) el?.pause()
+    videoEl.value?.pause()
     const delay = import.meta.client && window.innerWidth < 768 ? 2000 : 10000
     unloadTimer = setTimeout(() => {
       showVideo.value = false
       videoReady.value = false
-      for (const k of Object.keys(videoEls)) delete videoEls[Number(k)]
       videoBudget.unregister(props.project.id)
       unloadTimer = null
     }, delay)

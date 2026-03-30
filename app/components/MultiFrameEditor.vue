@@ -34,14 +34,39 @@
             <div class="flex-1 p-5 border-b lg:border-b-0 lg:border-r border-white/[0.06]">
               <div class="text-[9px] text-white/25 uppercase tracking-[0.2em] mb-3">Preview</div>
               <div
-                class="relative bg-black/40 border border-white/[0.06] mx-auto"
+                class="relative bg-black/40 border border-white/[0.06] mx-auto overflow-hidden"
                 :style="{ width: `${previewW}px`, height: `${previewH}px` }"
               >
-                <!-- Frames at scale -->
+                <!-- SVG clip-path for thumbnail (matches cluster rendering) -->
+                <svg class="absolute" width="0" height="0" aria-hidden="true">
+                  <defs>
+                    <clipPath id="editor-preview-clip" :clipPathUnits="'userSpaceOnUse'">
+                      <rect
+                        v-for="(frame, i) in localFrames"
+                        :key="i"
+                        :x="frame.x * scale"
+                        :y="frame.y * scale"
+                        :width="frame.w * scale"
+                        :height="frame.h * scale"
+                      />
+                    </clipPath>
+                  </defs>
+                </svg>
+
+                <!-- Thumbnail clipped to frame areas (same as real cluster) -->
+                <img
+                  v-if="previewThumb"
+                  :src="previewThumb"
+                  class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                  style="clip-path: url(#editor-preview-clip);"
+                  draggable="false"
+                />
+
+                <!-- Frame overlays (borders, selection, drag) -->
                 <div
                   v-for="(frame, i) in localFrames"
-                  :key="i"
-                  class="absolute border overflow-hidden cursor-pointer transition-all duration-150 frame-clip"
+                  :key="'frame-' + i"
+                  class="absolute border cursor-pointer transition-all duration-150 frame-clip"
                   :class="[
                     selectedIdx === i ? 'border-amber-400/60 shadow-[0_0_12px_rgba(251,191,36,0.15)]' : 'border-white/15 hover:border-white/25',
                     draggingIdx === i ? 'z-10 cursor-grabbing' : 'cursor-grab',
@@ -54,20 +79,8 @@
                   }"
                   @pointerdown.stop="onFramePointerDown($event, i)"
                 >
-                  <!-- Thumbnail preview -->
-                  <div class="relative overflow-hidden" :style="{ height: `${frame.h * scale}px` }">
-                    <img
-                      v-if="previewThumb"
-                      :src="previewThumb"
-                      class="absolute inset-0 w-full h-full object-cover"
-                      :style="{
-                        objectPosition: `${frame.cropX * 100}% ${frame.cropY * 100}%`,
-                        transform: `scale(${frame.zoom})`,
-                      }"
-                      draggable="false"
-                    />
-                    <div v-else class="w-full h-full bg-white/[0.03]" />
-                  </div>
+                  <!-- Transparent media area (thumbnail shows through from behind) -->
+                  <div :style="{ height: `${frame.h * scale}px` }" />
                   <!-- Mini info bar -->
                   <div class="bg-black/50 px-1 flex items-center justify-between" :style="{ height: `${36 * scale}px` }">
                     <span class="text-white/50 uppercase truncate" :style="{ fontSize: `${Math.max(6, 10 * scale)}px` }">{{ i + 1 }}</span>
@@ -113,26 +126,8 @@
                   </div>
                 </div>
 
-                <div class="border-t border-white/[0.06] pt-3">
-                  <div class="text-[8px] text-white/20 uppercase tracking-[0.2em] mb-2">Crop & Zoom</div>
-                </div>
-
-                <!-- Crop -->
-                <div class="grid grid-cols-2 gap-2">
-                  <div>
-                    <label class="block text-[8px] text-white/25 uppercase tracking-[0.2em] mb-1">Crop X (0-1)</label>
-                    <input v-model.number="selected.cropX" type="number" step="0.05" min="0" max="1" class="field" />
-                  </div>
-                  <div>
-                    <label class="block text-[8px] text-white/25 uppercase tracking-[0.2em] mb-1">Crop Y (0-1)</label>
-                    <input v-model.number="selected.cropY" type="number" step="0.05" min="0" max="1" class="field" />
-                  </div>
-                </div>
-
-                <!-- Zoom -->
-                <div>
-                  <label class="block text-[8px] text-white/25 uppercase tracking-[0.2em] mb-1">Zoom</label>
-                  <input v-model.number="selected.zoom" type="number" step="0.1" min="0.5" max="3" class="field" />
+                <div class="mt-2 text-[8px] text-white/15 normal-case tracking-normal leading-relaxed">
+                  Position determines which part of the video shows through. The video fills the entire cluster and each frame reveals its portion.
                 </div>
               </div>
 
