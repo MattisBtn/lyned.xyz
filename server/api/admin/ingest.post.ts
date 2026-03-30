@@ -8,10 +8,40 @@ function seededRandom(seed: number) {
   }
 }
 
+// Parse WebP RIFF header to extract width/height (first 30 bytes suffice)
+function parseWebpDimensions(buf: ArrayBuffer): { w: number, h: number } | null {
+  const view = new DataView(buf)
+  if (buf.byteLength < 30) return null
+  // RIFF header: bytes 0-3 = "RIFF", 8-11 = "WEBP", 12-15 = chunk type
+  const riff = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3))
+  if (riff !== 'RIFF') return null
+  const chunk = String.fromCharCode(view.getUint8(12), view.getUint8(13), view.getUint8(14), view.getUint8(15))
+  if (chunk === 'VP8 ') {
+    // Lossy: width/height at bytes 26-29 (little-endian 16-bit each)
+    const w = view.getUint16(26, true) & 0x3FFF
+    const h = view.getUint16(28, true) & 0x3FFF
+    return w && h ? { w, h } : null
+  }
+  if (chunk === 'VP8L') {
+    // Lossless: dimensions packed in bytes 21-24
+    const bits = view.getUint32(21, true)
+    const w = (bits & 0x3FFF) + 1
+    const h = ((bits >> 14) & 0x3FFF) + 1
+    return { w, h }
+  }
+  if (chunk === 'VP8X') {
+    // Extended: canvas size at bytes 24-29 (24-bit LE each)
+    const w = (view.getUint8(24) | (view.getUint8(25) << 8) | (view.getUint8(26) << 16)) + 1
+    const h = (view.getUint8(27) | (view.getUint8(28) << 8) | (view.getUint8(29) << 16)) + 1
+    return { w, h }
+  }
+  return null
+}
+
 export default defineEventHandler(async (event) => {
   checkAdminAuth(event)
 
-  const { listR2Objects, putJsonToR2, getFromR2 } = await import('~~/server/lib/r2')
+  const { listR2Objects, putJsonToR2, getFromR2, getBytesFromR2 } = await import('~~/server/lib/r2')
   const PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
 
   // Load existing projects to preserve metadata (description, link)
@@ -27,6 +57,8 @@ export default defineEventHandler(async (event) => {
       }
     }
   } catch { /* no existing data */ }
+
+  // Note: aspectRatio is computed fresh each ingest (not preserved from metadata)
 
   const allKeys = await listR2Objects()
   const graphic = allKeys.filter(k => k.startsWith('graphic/') && k.endsWith('.webp'))
@@ -58,6 +90,30 @@ export default defineEventHandler(async (event) => {
       }
     }),
   ]
+
+  // Fetch aspect ratios from WebP headers (30 bytes each, parallel)
+  const ratioMap: Record<string, number> = {}
+  const webpKeys = [
+    ...graphic,
+    ...thumbs,
+  ]
+  await Promise.all(webpKeys.map(async (key) => {
+    try {
+      const buf = await getBytesFromR2(key, 30)
+      if (!buf) return
+      const dims = parseWebpDimensions(buf)
+      if (!dims) return
+      // Map to project slug
+      const slug = key.replace(/^(graphic|thumbs)\//, '').replace('.webp', '')
+      ratioMap[slug] = Math.round((dims.w / dims.h) * 1000) / 1000
+    } catch { /* skip */ }
+  }))
+
+  // Assign aspectRatio to projects
+  for (const p of allProjects) {
+    const ratio = ratioMap[p.id]
+    if (ratio) (p as any).aspectRatio = ratio
+  }
 
   // Organic placement
   const rand = seededRandom(42)

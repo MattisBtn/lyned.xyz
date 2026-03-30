@@ -44,7 +44,8 @@
               v-if="project.type === 'image'"
               :src="project.src"
               :alt="project.title"
-              class="max-w-[82vw] max-h-[72vh] object-contain block"
+              class="object-contain block"
+              :style="assetStyle"
             />
             <video
               v-else
@@ -52,7 +53,8 @@
               controls
               autoplay
               muted
-              class="max-w-[82vw] max-h-[72vh] block"
+              class="block"
+              :style="assetStyle"
             />
           </div>
 
@@ -122,6 +124,22 @@ const safeLink = computed(() => {
 })
 
 const hasInfo = computed(() => !!(props.project?.description || safeLink.value))
+
+const isPortrait = computed(() => {
+  const r = props.project?.aspectRatio
+  return r != null && r < 1
+})
+
+const isMobile = useIsMobile()
+
+const assetStyle = computed(() => {
+  if (isPortrait.value) {
+    return isMobile.value
+      ? { maxWidth: '85vw', maxHeight: '75vh' }
+      : { maxWidth: '45vw', maxHeight: '80vh' }
+  }
+  return { maxWidth: '82vw', maxHeight: '72vh' }
+})
 
 function close() {
   emit('close')

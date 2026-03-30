@@ -43,6 +43,15 @@ export async function deleteFromR2(key: string) {
   if (!res.ok && res.status !== 404) { console.error(`R2 delete failed: ${res.status}`); throw new Error('Storage delete failed') }
 }
 
+export async function getBytesFromR2(key: string, bytes: number): Promise<ArrayBuffer | null> {
+  const client = getClient()
+  const res = await client.fetch(bucketUrl(key), {
+    headers: { Range: `bytes=0-${bytes - 1}` },
+  })
+  if (!res.ok && res.status !== 206) return null
+  return await res.arrayBuffer()
+}
+
 export async function getFromR2(key: string): Promise<string | null> {
   const client = getClient()
   const res = await client.fetch(bucketUrl(key))
