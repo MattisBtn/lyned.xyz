@@ -26,11 +26,20 @@ function isValidVideo(data: Buffer | Uint8Array): boolean {
 
 export default defineEventHandler(async (event) => {
   checkAdminAuth(event)
-  const { uploadToR2 } = await import('~~/server/lib/r2')
+  const { uploadToR2, getBucketUsage, R2_STORAGE_LIMIT } = await import('~~/server/lib/r2')
 
   const files = await readMultipartFormData(event)
   if (!files || files.length === 0) {
     throw createError({ statusCode: 400, message: 'No files uploaded' })
+  }
+
+  // Check storage limit before uploading (R2 free tier: 10GB)
+  const { totalBytes } = await getBucketUsage()
+  const uploadSize = files.reduce((sum, f) => sum + (f.data?.length || 0), 0)
+  if (totalBytes + uploadSize > R2_STORAGE_LIMIT) {
+    const usedGB = (totalBytes / (1024 ** 3)).toFixed(2)
+    const limitGB = (R2_STORAGE_LIMIT / (1024 ** 3)).toFixed(0)
+    throw createError({ statusCode: 413, message: `Storage limit reached (${usedGB}GB / ${limitGB}GB). Delete assets before uploading.` })
   }
 
   const uploaded: { key: string, url: string, type: string }[] = []

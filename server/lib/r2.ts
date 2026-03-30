@@ -69,6 +69,38 @@ export async function putJsonToR2(key: string, data: any) {
   if (!res.ok) { console.error(`R2 putJson failed: ${res.status}`); throw new Error('Storage write failed') }
 }
 
+// R2 free tier: 10GB. Keep 1GB headroom for metadata/JSON files.
+export const R2_STORAGE_LIMIT = 9 * 1024 * 1024 * 1024
+
+export async function getBucketUsage(): Promise<{ totalBytes: number, objectCount: number }> {
+  const client = getClient()
+  const url = new URL(bucketUrl())
+  url.searchParams.set('list-type', '2')
+
+  let totalBytes = 0
+  let objectCount = 0
+  let continuationToken: string | undefined
+
+  do {
+    if (continuationToken) url.searchParams.set('continuation-token', continuationToken)
+    const res = await client.fetch(url.toString())
+    if (!res.ok) throw new Error(`R2 list failed: ${res.status}`)
+    const xml = await res.text()
+
+    const sizeMatches = xml.matchAll(/<Size>(\d+)<\/Size>/g)
+    for (const match of sizeMatches) {
+      totalBytes += parseInt(match[1], 10)
+      objectCount++
+    }
+
+    const truncated = xml.includes('<IsTruncated>true</IsTruncated>')
+    const tokenMatch = xml.match(/<NextContinuationToken>([^<]+)<\/NextContinuationToken>/)
+    continuationToken = truncated && tokenMatch ? tokenMatch[1] : undefined
+  } while (continuationToken)
+
+  return { totalBytes, objectCount }
+}
+
 export async function listR2Objects(prefix?: string): Promise<string[]> {
   const client = getClient()
   const url = new URL(bucketUrl())

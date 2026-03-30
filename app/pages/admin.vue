@@ -86,7 +86,7 @@
       </div>
 
       <!-- Stats bar -->
-      <div class="flex gap-6 mb-8">
+      <div class="flex flex-wrap items-center gap-6 mb-8">
         <div class="flex items-center gap-2">
           <div class="w-1.5 h-1.5 rounded-full bg-white/30" />
           <span class="text-[10px] text-white/50 uppercase tracking-[0.15em]">{{ assets.graphic.length }} Graphic</span>
@@ -94,6 +94,18 @@
         <div class="flex items-center gap-2">
           <div class="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
           <span class="text-[10px] text-white/50 uppercase tracking-[0.15em]">{{ assets.motion.length }} Motion</span>
+        </div>
+        <div v-if="storageInfo" class="flex items-center gap-2 ml-auto">
+          <div class="w-20 h-1.5 bg-white/[0.06] overflow-hidden rounded-sm">
+            <div
+              class="h-full transition-all duration-500"
+              :class="storageInfo.percent > 85 ? 'bg-red-400/80' : storageInfo.percent > 60 ? 'bg-amber-400/80' : 'bg-emerald-400/60'"
+              :style="{ width: `${storageInfo.percent}%` }"
+            />
+          </div>
+          <span class="text-[9px] text-white/30 uppercase tracking-[0.15em] tabular-nums">
+            {{ storageInfo.usedGB }}GB / {{ storageInfo.limitGB }}GB
+          </span>
         </div>
       </div>
 
@@ -511,6 +523,13 @@ const assets = reactive<{ graphic: any[], motion: any[] }>({
 
 const token = ref('')
 const projectsList = ref<any[]>([])
+const storageInfo = ref<{ usedGB: number, limitGB: number, percent: number } | null>(null)
+
+async function loadStorage() {
+  try {
+    storageInfo.value = await $fetch('/api/admin/storage', { headers: authHeaders() })
+  } catch { /* silent */ }
+}
 
 function authHeaders(): Record<string, string> {
   return token.value ? { 'x-admin-token': token.value } : {}
@@ -564,6 +583,7 @@ async function loadAssets() {
     projectsList.value = data.projects || []
     assets.graphic = projectsList.value.filter(p => p.type === 'image')
     assets.motion = projectsList.value.filter(p => p.type === 'video')
+    loadStorage()
   } catch {
     // Not authenticated
   }
