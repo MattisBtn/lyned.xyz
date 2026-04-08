@@ -36,6 +36,7 @@
       ref="videoEl"
       :src="project.src"
       muted
+      autoplay
       loop
       playsinline
       class="absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-500"
