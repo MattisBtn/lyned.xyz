@@ -37,6 +37,20 @@ export async function uploadToR2(key: string, body: Buffer | Uint8Array, content
   return publicUrl(key)
 }
 
+export async function getPresignedUploadUrl(key: string, contentType: string, contentLength: number): Promise<string> {
+  const client = getClient()
+  const url = bucketUrl(key)
+  const signed = await client.sign(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(contentLength),
+    },
+    aws: { signQuery: true },
+  })
+  return signed.url
+}
+
 export async function deleteFromR2(key: string) {
   const client = getClient()
   const res = await client.fetch(bucketUrl(key), { method: 'DELETE' })

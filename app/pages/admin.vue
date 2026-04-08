@@ -123,12 +123,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
           </svg>
           <p class="text-[10px] uppercase tracking-[0.2em] text-white/40 mb-1">Drop files here</p>
-          <p class="text-[9px] text-white/20 mb-4">PNG, JPG, MP4, MKV, MOV</p>
+          <p class="text-[9px] text-white/20 mb-4">PNG, JPG, WebP, MP4, WebM — max 50MB</p>
           <input
             ref="fileInput"
             type="file"
             multiple
-            accept="image/*,video/*"
+            accept=".png,.jpg,.jpeg,.webp,.mp4,.webm"
             class="hidden"
             @change="onFileSelect"
           />
@@ -151,6 +151,20 @@
           </div>
         </Transition>
       </div>
+
+      <!-- Upload error -->
+      <Transition name="slide">
+        <div v-if="uploadError" class="relative mb-8 border border-red-400/20 bg-red-400/[0.04] clip-sm overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-red-400/10">
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-1.5 rounded-full bg-red-400" />
+              <span class="text-[9px] text-red-400/70 uppercase tracking-[0.2em]">Upload Error</span>
+            </div>
+            <button type="button" class="text-[9px] text-white/30 hover:text-white/60 uppercase" @click="uploadError = ''">Clear</button>
+          </div>
+          <pre class="px-4 py-3 text-[10px] text-red-400/60 whitespace-pre-wrap font-mono leading-relaxed">{{ uploadError }}</pre>
+        </div>
+      </Transition>
 
       <!-- Ingest output -->
       <Transition name="slide">
@@ -441,6 +455,7 @@ const loginError = ref('')
 const dragOver = ref(false)
 const uploading = ref(false)
 const uploadCount = ref(0)
+const uploadError = ref('')
 const ingesting = ref(false)
 const ingestOutput = ref('')
 const preview = ref<{ src: string, type: string, title: string } | null>(null)
@@ -562,7 +577,11 @@ function isImageFile(name: string) {
 }
 
 function isVideoFile(name: string) {
-  return /\.(mp4|mkv|mov|webm)$/i.test(name)
+  return /\.(mp4|webm)$/i.test(name)
+}
+
+function isUnsupportedVideo(name: string) {
+  return /\.(mkv|mov|avi|wmv|flv)$/i.test(name)
 }
 
 async function login() {
@@ -590,34 +609,90 @@ async function loadAssets() {
 }
 
 async function uploadFiles(files: FileList | File[]) {
+  uploadError.value = ''
   uploading.value = true
-  uploadCount.value = files.length
 
-  const formData = new FormData()
+  const fileArr = Array.from(files)
 
-  for (const file of Array.from(files)) {
-    if (isImageFile(file.name)) {
-      // Compress image to WebP client-side
+  // Client-side rejection of unsupported formats
+  const unsupported = fileArr.filter(f => isUnsupportedVideo(f.name))
+  const images = fileArr.filter(f => isImageFile(f.name))
+  const videos = fileArr.filter(f => isVideoFile(f.name))
+  const unknown = fileArr.filter(f => !isImageFile(f.name) && !isVideoFile(f.name) && !isUnsupportedVideo(f.name))
+
+  const warnings: string[] = []
+  if (unsupported.length) {
+    warnings.push(`${unsupported.map(f => f.name).join(', ')}: format not supported — convert to MP4 or WebM`)
+  }
+  if (unknown.length) {
+    warnings.push(`${unknown.map(f => f.name).join(', ')}: unsupported file type`)
+  }
+
+  if (!images.length && !videos.length) {
+    if (warnings.length) uploadError.value = warnings.join('\n')
+    uploading.value = false
+    return
+  }
+
+  uploadCount.value = images.length + videos.length
+  const errors: string[] = []
+
+  // Images: compress to WebP and upload via server proxy (small files, keeps magic-byte validation)
+  if (images.length) {
+    const formData = new FormData()
+    for (const file of images) {
       try {
         const webpBlob = await compressImageToWebP(file)
         const webpName = file.name.replace(/\.[^.]+$/, '.webp')
         formData.append('files', new File([webpBlob], webpName, { type: 'image/webp' }))
       } catch {
-        formData.append('files', file) // Fallback: upload as-is
+        formData.append('files', file)
       }
-    } else if (isVideoFile(file.name)) {
-      formData.append('files', file)
+    }
+    try {
+      const res = await $fetch<{ ok: boolean, errors?: string[] }>('/api/admin/upload', {
+        method: 'POST', body: formData, headers: authHeaders(),
+      })
+      if (res.errors?.length) errors.push(...res.errors)
+    } catch (err: any) {
+      errors.push(`Images: ${err?.data?.message || err?.message || 'upload failed'}`)
     }
   }
 
-  try {
-    await $fetch('/api/admin/upload', { method: 'POST', body: formData, headers: authHeaders() })
-    // Auto-run ingest after upload to regenerate positions
-    await runIngest()
-  } catch (err: any) {
-    console.error('Upload failed:', err)
+  // Videos: presigned URL for direct-to-R2 upload (bypasses Vercel body limit)
+  for (const file of videos) {
+    try {
+      const presign = await $fetch<{ url: string, key: string, type: string }>('/api/admin/presign', {
+        method: 'POST',
+        body: { filename: file.name, contentType: file.type, size: file.size },
+        headers: authHeaders(),
+      })
+
+      const putRes = await fetch(presign.url, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+          'Content-Length': String(file.size),
+        },
+      })
+
+      if (!putRes.ok) {
+        errors.push(`${file.name}: upload failed (${putRes.status})`)
+      }
+    } catch (err: any) {
+      errors.push(`${file.name}: ${err?.data?.message || err?.message || 'upload failed'}`)
+    }
   }
+
   uploading.value = false
+
+  if (errors.length || warnings.length) {
+    uploadError.value = [...warnings, ...errors].join('\n')
+  }
+
+  // Auto-run ingest after upload to regenerate positions
+  await runIngest()
 }
 
 function onDrop(e: DragEvent) {
