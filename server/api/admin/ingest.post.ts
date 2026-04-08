@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
 
   const allKeys = await listR2Objects()
   const graphic = allKeys.filter(k => k.startsWith('graphic/') && k.endsWith('.webp'))
-  const motion = allKeys.filter(k => k.startsWith('motion/') && k.endsWith('.mp4'))
+  const motion = allKeys.filter(k => k.startsWith('motion/') && (k.endsWith('.mp4') || k.endsWith('.webm')))
   const thumbs = allKeys.filter(k => k.startsWith('thumbs/') && k.endsWith('.webp'))
 
   // Build projects
@@ -78,7 +78,7 @@ export default defineEventHandler(async (event) => {
       }
     }),
     ...motion.map(key => {
-      const slug = key.replace('motion/', '').replace('.mp4', '')
+      const slug = key.replace('motion/', '').replace(/\.(mp4|webm)$/, '')
       const thumbKey = `thumbs/${slug}.webp`
       const hasThumb = thumbs.includes(thumbKey)
       return {

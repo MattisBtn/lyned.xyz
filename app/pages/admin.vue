@@ -572,6 +572,38 @@ async function compressImageToWebP(file: File, quality = 0.85): Promise<Blob> {
   })
 }
 
+function extractVideoThumbnail(file: File, timeSeconds = 0.5): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video')
+    video.preload = 'auto'
+    video.muted = true
+    video.playsInline = true
+
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(timeSeconds, video.duration || timeSeconds)
+    }
+
+    video.onseeked = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')!
+      ctx.drawImage(video, 0, 0)
+      canvas.toBlob(
+        blob => {
+          URL.revokeObjectURL(video.src)
+          blob ? resolve(blob) : reject(new Error('Thumbnail extraction failed'))
+        },
+        'image/webp',
+        0.8,
+      )
+    }
+
+    video.onerror = () => { URL.revokeObjectURL(video.src); reject(new Error('Video load failed')) }
+    video.src = URL.createObjectURL(file)
+  })
+}
+
 function isImageFile(name: string) {
   return /\.(png|jpg|jpeg|webp|bmp|gif)$/i.test(name)
 }
@@ -679,6 +711,19 @@ async function uploadFiles(files: FileList | File[]) {
 
       if (!putRes.ok) {
         errors.push(`${file.name}: upload failed (${putRes.status})`)
+        continue
+      }
+
+      // Extract first frame as thumbnail and upload to thumbs/
+      try {
+        const thumbBlob = await extractVideoThumbnail(file)
+        const slug = presign.key.replace('motion/', '').replace(/\.[^.]+$/, '')
+        const thumbForm = new FormData()
+        thumbForm.append('slug', slug)
+        thumbForm.append('image', new File([thumbBlob], `${slug}.webp`, { type: 'image/webp' }))
+        await $fetch('/api/admin/thumbnail', { method: 'POST', body: thumbForm, headers: authHeaders() })
+      } catch {
+        // Thumbnail generation failed — video still uploaded, just no preview
       }
     } catch (err: any) {
       errors.push(`${file.name}: ${err?.data?.message || err?.message || 'upload failed'}`)
