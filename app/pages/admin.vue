@@ -755,12 +755,17 @@ function onFileSelect(e: Event) {
 }
 
 async function deleteAsset(project: any) {
+  // Derive key from src URL (handles both .mp4 and .webm)
+  const src: string = project.src || ''
   const key = project.type === 'image'
     ? `graphic/${project.id}.webp`
-    : `motion/${project.id}.mp4`
+    : src.includes('/motion/') ? src.split('/').slice(-2).join('/') : `motion/${project.id}.mp4`
   try {
     await $fetch('/api/admin/delete', { method: 'POST', body: { key }, headers: authHeaders() })
-    // Re-run ingest to update positions
+    // Also delete thumbnail if it exists
+    if (project.type === 'video') {
+      await $fetch('/api/admin/delete', { method: 'POST', body: { key: `thumbs/${project.id}.webp` }, headers: authHeaders() }).catch(() => {})
+    }
     await runIngest()
   } catch (err: any) {
     console.error('Delete failed:', err)

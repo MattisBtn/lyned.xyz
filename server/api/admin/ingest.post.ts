@@ -38,9 +38,25 @@ function parseWebpDimensions(buf: ArrayBuffer): { w: number, h: number } | null 
   return null
 }
 
+let ingestLock: Promise<any> | null = null
+
 export default defineEventHandler(async (event) => {
   checkAdminAuth(event)
 
+  // Serialize concurrent ingests to prevent race conditions on projects.json
+  if (ingestLock) await ingestLock
+  let unlock: () => void
+  ingestLock = new Promise(resolve => { unlock = resolve })
+
+  try {
+    return await runIngest()
+  } finally {
+    unlock!()
+    ingestLock = null
+  }
+})
+
+async function runIngest() {
   const { listR2Objects, putJsonToR2, getFromR2, getBytesFromR2 } = await import('~~/server/lib/r2')
   const PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
 
@@ -187,4 +203,4 @@ export default defineEventHandler(async (event) => {
     ok: true,
     output: `Generated ${placed.length} projects (${graphic.length} images, ${motion.length} videos)`,
   }
-})
+}
